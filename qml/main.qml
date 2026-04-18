@@ -1,4 +1,4 @@
-// Axon Signals — negative Vm puzzle: nodes pull toward 0 mV, myelin re-deepens; collapse if Vm ≥ 0.
+// Axon Signals - negative Vm puzzle: nodes pull toward 0 mV, myelin re-deepens; collapse if Vm >= 0.
 // Web Dojo: entry file; sibling js/signalSim.js.
 
 import QtQuick 2.15
@@ -11,7 +11,7 @@ ApplicationWindow {
     visible: true
     width: 960
     height: 680
-    title: "Axon Signals — LD Prototype"
+    title: "Axon Signals - LD Prototype"
     color: "#070910"
 
     property int segmentCount: 26
@@ -30,7 +30,7 @@ ApplicationWindow {
         nodes: [],
         config: { startVoltage: -70, brainActivationThreshold: -55, failIfVoltageGte: 0 }
     })
-    property string statusLine: "Nodes (gaps + ends) pull Vm toward 0; myelin pushes it negative again. Stay below 0 mV; reach the brain at or below −55 mV."
+    property string statusLine: "Nodes (gaps + ends) pull Vm toward 0; myelin pushes it negative again. Stay below 0 mV; reach the brain at or below -55 mV."
 
     property bool playbackActive: false
     property real signalAlong: 0
@@ -80,7 +80,7 @@ ApplicationWindow {
         stopPlayback();
         myelin = defaultMyelinPattern();
         refreshPreview();
-        statusLine = "Foot → Brain: myelin re-strengthens Vm (more negative); each Ranvier node relaxes it toward 0. Never reach 0 mV.";
+        statusLine = "Foot -> Brain: myelin re-strengthens Vm (more negative); each Ranvier node relaxes it toward 0. Never reach 0 mV.";
     }
 
     function refreshPreview() {
@@ -108,7 +108,7 @@ ApplicationWindow {
         return u * u * (3 - 2 * u);
     }
 
-    // More negative Vm → stronger pulse (1). Near 0 mV → weak (approaches 0).
+    // More negative Vm -> stronger pulse (1). Near 0 mV -> weak (approaches 0).
     function signalStrengthFromV(vm) {
         return Math.max(0.12, Math.min(1.0, (-vm) / 80.0));
     }
@@ -146,7 +146,7 @@ ApplicationWindow {
             win.signalAlong = leg.fromFrac + (leg.toFrac - leg.fromFrac) * sm;
             win.displayVoltage = leg.vFrom + (leg.vTo - leg.vFrom) * sm;
 
-            if (leg.kind === "NODE") {
+            if (leg.nodeFlash) {
                 win.nodeSpikeBoost = Math.max(0, 1 - Math.abs(legU - 0.5) * 2.35);
                 win.nodeSpikeSeg = leg.segIndex;
             } else {
@@ -167,11 +167,11 @@ ApplicationWindow {
                     if (win.lastSim.ok) {
                         var thr = (win.lastSim.config && win.lastSim.config.brainActivationThreshold !== undefined)
                                 ? win.lastSim.config.brainActivationThreshold : -55;
-                        win.statusLine = "Success — Vm reached the brain at or below "
+                        win.statusLine = "Success - Vm reached the brain at or below "
                                 + Math.round(thr * 10) / 10 + " mV without collapsing.";
                     }
                     else
-                        win.statusLine = "Failed — " + win.describeFail(win.lastSim.failReason);
+                        win.statusLine = "Failed - " + win.describeFail(win.lastSim.failReason);
                     win.refreshPreview();
                     return;
                 }
@@ -218,7 +218,7 @@ ApplicationWindow {
                 font.pixelSize: 12
             }
             Label {
-                text: "Brain ≤ <b>" + ((lastSim.config && lastSim.config.brainActivationThreshold !== undefined)
+                text: "Brain need <b>" + ((lastSim.config && lastSim.config.brainActivationThreshold !== undefined)
                         ? Math.round(lastSim.config.brainActivationThreshold * 10) / 10 : -55) + " mV</b>"
                 color: "#d49bff"
                 textFormat: Text.RichText
@@ -231,7 +231,7 @@ ApplicationWindow {
                 font.pixelSize: 13
             }
             Label {
-                text: "Peak→0: <b>" + Math.round(lastSim.peakVoltage * 10) / 10 + " mV</b>"
+                text: "Peak->0: <b>" + Math.round(lastSim.peakVoltage * 10) / 10 + " mV</b>"
                 color: "#c8b8ff"
                 textFormat: Text.RichText
                 font.pixelSize: 11
@@ -330,7 +330,7 @@ ApplicationWindow {
                                     }
                                     readonly property real spikeBoost: (win.nodeSpikeSeg === index) ? win.nodeSpikeBoost * 0.95 : 0
                                     readonly property real pulseGlow: {
-                                        // No high-frequency flicker on MYELIN — calmer propagation leg.
+                                        // No high-frequency flicker on MYELIN - calmer propagation leg.
                                         var flick = (!isMyelin && collapseRisk > 0.2)
                                                 ? 0.14 * collapseRisk * Math.abs(Math.sin(win.ionClock * 10.7))
                                                 : 0;
@@ -561,14 +561,14 @@ ApplicationWindow {
         RowLayout {
             spacing: 10
             Button {
-                text: win.playbackActive ? "Running…" : "Send Signal"
+                text: win.playbackActive ? "Running..." : "Send Signal"
                 highlighted: true
                 enabled: !win.playbackActive
                 onClicked: {
                     win.stopPlayback();
                     win.lastSim = SignalSim.simulate(win.myelin, null);
                     win.statusLine = win.lastSim.ok
-                            ? "Send: keep Vm below 0 mV and finish the brain at or below −55 mV."
+                            ? "Send: keep Vm below 0 mV and finish the brain at or below -55 mV."
                             : "Risk: too many nodes drag Vm toward 0; myelin must pull it negative again before collapse.";
                     win.startSignalPlayback();
                 }

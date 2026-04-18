@@ -1,20 +1,20 @@
-// signalSim.js — game-style axon voltage (negative mV). Not a biophysical model.
+// signalSim.js - game-style axon voltage (negative mV). Not a biophysical model.
 //
 // Voltage convention (algebraic):
-//   • More NEGATIVE Vm = stronger / “deeper” signal (used for brighter pulse read).
-//   • Vm moving toward 0 = weaker (risky); Vm >= 0 = collapsed failure.
-//   • Ranvier NODE steps pull Vm toward 0 (add positive delta: nodePenalty).
-//   • MYELIN steps re-deepen Vm (add negative delta: myelinBoost).
+//   * More NEGATIVE Vm = stronger / "deeper" signal (used for brighter pulse read).
+//   * Vm moving toward 0 = weaker (risky); Vm >= 0 = collapsed failure.
+//   * Ranvier NODE steps pull Vm toward 0 (add positive delta: nodePenalty).
+//   * MYELIN steps re-deepen Vm (add negative delta: myelinBoost).
 //
-// All tuning lives in `defaultConfig` — tweak there only.
+// All tuning lives in `defaultConfig` - tweak there only.
 .pragma library
 
 var defaultConfig = {
     // --- Voltage tuning (mV, algebraic) ---
     startVoltage: -70,
-    // Ranvier NODE: move Vm toward zero (less negative), e.g. −70 + 12 = −58.
+    // Ranvier NODE: move Vm toward zero (less negative), e.g. -70 + 12 = -58.
     nodePenalty: 12,
-    // MYELIN: move Vm more negative again, e.g. −58 + (−6) = −64.
+    // MYELIN: move Vm more negative again, e.g. -58 + (-6) = -64.
     myelinBoost: -6,
     // LEAKY exposed (not a true Ranvier gap): partial pull toward zero (tweakable).
     leakPenalty: 7,
