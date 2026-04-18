@@ -305,11 +305,12 @@ ApplicationWindow {
                                     height: axonRow.height
 
                                     readonly property bool isEnd: index === 0 || index === win.segmentCount - 1
-                                    readonly property string segKind: SignalSim.segmentKind(win.myelin, index, win.segmentCount)
-                                    readonly property bool isMyelin: segKind === "MYELIN"
-                                    readonly property bool isNode: segKind === "NODE"
-                                    readonly property bool showEnzymes: isNode
-                                    readonly property bool showRanvierStripes: isNode
+                                    // UI must use myelin[] only, not SignalSim.segmentKind: pragma-library JS can cache
+                                    // an older model (e.g. LEAKY) so pumps/stripes would stay wrong until full restart.
+                                    readonly property bool isMyelin: !!win.myelin[index]
+                                    readonly property bool isRanvier: !isMyelin
+                                    readonly property bool showEnzymes: isRanvier
+                                    readonly property bool showRanvierStripes: isRanvier
 
                                     readonly property real sigDist: Math.abs(
                                         index - win.signalAlong * (win.segmentCount - 1))
