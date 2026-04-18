@@ -338,13 +338,14 @@ ApplicationWindow {
                                     }
 
                                     Rectangle {
+                                        z: 0
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: isMyelin ? 24 : 22
                                         height: 100
                                         radius: 9
-                                        border.width: isMyelin ? 1 : 2
-                                        border.color: isMyelin ? "#1e3a28" : "#ff9a4d"
+                                        border.width: isMyelin ? 1 : 3
+                                        border.color: isMyelin ? "#1e3a28" : "#ff9933"
                                         gradient: Gradient {
                                             GradientStop {
                                                 position: 0
@@ -362,6 +363,7 @@ ApplicationWindow {
                                     }
 
                                     Rectangle {
+                                        z: 1
                                         visible: isMyelin
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.verticalCenter: parent.verticalCenter
@@ -373,6 +375,7 @@ ApplicationWindow {
                                         anchors.horizontalCenterOffset: -10
                                     }
                                     Rectangle {
+                                        z: 1
                                         visible: isMyelin
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.verticalCenter: parent.verticalCenter
@@ -384,41 +387,8 @@ ApplicationWindow {
                                         anchors.horizontalCenterOffset: 10
                                     }
 
-                                    Column {
-                                        visible: isRanvier
-                                        anchors.centerIn: parent
-                                        spacing: 5
-                                        Rectangle {
-                                            width: 9
-                                            height: 2
-                                            radius: 1
-                                            color: "#ffb070"
-                                            opacity: 0.4
-                                        }
-                                        Rectangle {
-                                            width: 9
-                                            height: 2
-                                            radius: 1
-                                            color: "#ffb070"
-                                            opacity: 0.54
-                                        }
-                                        Rectangle {
-                                            width: 9
-                                            height: 2
-                                            radius: 1
-                                            color: "#ffb070"
-                                            opacity: 0.68
-                                        }
-                                        Rectangle {
-                                            width: 9
-                                            height: 2
-                                            radius: 1
-                                            color: "#ffb070"
-                                            opacity: 0.82
-                                        }
-                                    }
-
                                     Rectangle {
+                                        z: 2
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.verticalCenter: parent.verticalCenter
                                         width: 5
@@ -428,8 +398,65 @@ ApplicationWindow {
                                         opacity: isMyelin ? 0.25 : 0.72
                                     }
 
+                                    Rectangle {
+                                        z: 3
+                                        visible: isRanvier
+                                        anchors.centerIn: parent
+                                        width: 20
+                                        height: 84
+                                        radius: 8
+                                        color: "transparent"
+                                        border.width: 2
+                                        border.color: Qt.rgba(0.35, 0.95, 1.0,
+                                            0.1 + 0.82 * pulseGlow + 0.5 * spikeBoost)
+                                        opacity: 0.18 + pulseGlow * 0.78 + spikeBoost * 0.48
+                                    }
+
+                                    Column {
+                                        z: 6
+                                        visible: isRanvier
+                                        anchors.centerIn: parent
+                                        spacing: 6
+                                        Rectangle {
+                                            width: 12
+                                            height: 3
+                                            radius: 1
+                                            color: "#ffb070"
+                                            border.width: 1
+                                            border.color: "#ffcca8"
+                                            opacity: 0.52
+                                        }
+                                        Rectangle {
+                                            width: 12
+                                            height: 3
+                                            radius: 1
+                                            color: "#ffb070"
+                                            border.width: 1
+                                            border.color: "#ffcca8"
+                                            opacity: 0.66
+                                        }
+                                        Rectangle {
+                                            width: 12
+                                            height: 3
+                                            radius: 1
+                                            color: "#ffb070"
+                                            border.width: 1
+                                            border.color: "#ffcca8"
+                                            opacity: 0.8
+                                        }
+                                        Rectangle {
+                                            width: 12
+                                            height: 3
+                                            radius: 1
+                                            color: "#ffb070"
+                                            border.width: 1
+                                            border.color: "#ffcca8"
+                                            opacity: 0.94
+                                        }
+                                    }
+
                                     Item {
-                                        z: 8
+                                        z: 10
                                         visible: isRanvier
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.top: parent.top
@@ -484,7 +511,7 @@ ApplicationWindow {
                                     }
 
                                     Item {
-                                        z: 9
+                                        z: 11
                                         visible: isRanvier
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
@@ -525,22 +552,8 @@ ApplicationWindow {
                                         }
                                     }
 
-                                    Rectangle {
-                                        z: 4
-                                        visible: isRanvier
-                                        anchors.centerIn: parent
-                                        width: 20
-                                        height: 84
-                                        radius: 8
-                                        color: "transparent"
-                                        border.width: 2
-                                        border.color: Qt.rgba(0.35, 0.95, 1.0,
-                                            0.1 + 0.82 * pulseGlow + 0.5 * spikeBoost)
-                                        opacity: 0.18 + pulseGlow * 0.78 + spikeBoost * 0.48
-                                    }
-
                                     Label {
-                                        z: 12
+                                        z: 4
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
                                         anchors.bottomMargin: 1
