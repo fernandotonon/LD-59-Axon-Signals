@@ -1,27 +1,32 @@
-// signalSim.js - game-style axon voltage (negative mV). Not a biophysical model.
+// signalSim.js - saltatory-style axon conduction (jam-friendly abstraction).
 //
-// Voltage convention (algebraic):
-//   * More NEGATIVE Vm = stronger / "deeper" signal (used for brighter pulse read).
-//   * Vm moving toward 0 = weaker (risky); Vm >= 0 = collapsed failure.
-//   * Ranvier NODE (any non-myelin segment) deepens Vm (more negative: ranvierDeepen).
-//   * MYELIN steps relax Vm toward 0 mV (less negative: myelinRelax).
+// signalStrength: how much depolarizing "oomph" remains as the wave moves (gameplay core).
+// Myelin: low passive loss per segment. Exposed / internode gap: high loss.
+// Interior Ranvier gaps: must still be strong enough to fire the node; firing resets strength
+// and spends ATP. Brain: no regeneration; need strength >= brainActivationThreshold.
 //
-// All tuning lives in `defaultConfig` - tweak there only.
+// Vm readout in UI maps strength to educational mV via strengthToDisplayVm() only.
 .pragma library
 
 var defaultConfig = {
-    // --- Voltage tuning (mV, algebraic) ---
-    startVoltage: -70,
-    // Ranvier NODE: deepen Vm (more negative), e.g. -70 + (-6) = -76.
-    ranvierDeepen: -6,
-    // MYELIN: relax toward 0 (less negative), e.g. -76 + 12 = -64.
-    myelinRelax: 12,
+    restingPotential: -70,
+    thresholdPotential: -55,
+    spikePotential: 30,
 
-    failIfVoltageGte: 0,
-    brainActivationThreshold: -55,
+    initialSignalStrength: 100,
+    signalThresholdToFireNode: 35,
+    regeneratedSignalStrength: 100,
 
-    // Legacy field kept for QML bindings that still read `energyAfter` on steps (unused in rules).
-    startEnergy: 100
+    baseMyelinDecayPerUnit: 4,
+    baseUnmyelinatedDecayPerUnit: 12,
+
+    nodeATPcost: 1,
+    initialATP: 8,
+
+    signalSpeedMyelinated: 1.4,
+    signalSpeedNode: 0.7,
+
+    brainActivationThreshold: 40
 };
 
 function segmentKind(myelin, i, n) {
@@ -46,8 +51,65 @@ function buildRanvierNodeIndices(myelin) {
     return out;
 }
 
-// Returns { ok, voltage, peakVoltage, steps, failReason, nodes, config }.
-// peakVoltage = algebraically maximum Vm (closest to 0) seen along the trace.
+// Map strength (0..initial) to a pseudo membrane mV for the HUD (weak = closer to threshold).
+function strengthToDisplayVm(strength, c) {
+    var cap = c.initialSignalStrength > 0 ? c.initialSignalStrength : 100;
+    var t = Math.max(0, Math.min(1, strength / cap));
+    return c.restingPotential + (1 - t) * (c.thresholdPotential - c.restingPotential);
+}
+
+function buildPlaybackTimeline(steps, n, cfg) {
+    var c = {};
+    for (var key in defaultConfig)
+        c[key] = defaultConfig[key];
+    if (cfg) {
+        for (var k in cfg)
+            c[k] = cfg[k];
+    }
+
+    var out = [];
+    if (!steps || n < 2)
+        return out;
+
+    var baseMyelinMs = 200;
+    var baseNodeMs = 280;
+
+    for (var j = 0; j < steps.length; j++) {
+        var s = steps[j];
+        if (s.type !== "hop")
+            continue;
+        var i = s.index;
+        var fromF = (i + 0.06) / (n - 1);
+        var toF = (i + 0.9) / (n - 1);
+        if (i === n - 1)
+            toF = 1.0;
+
+        var dur;
+        if (s.phase === "regen")
+            dur = baseNodeMs / c.signalSpeedNode;
+        else if (s.kind === "MYELIN")
+            dur = baseMyelinMs / c.signalSpeedMyelinated;
+        else
+            dur = baseNodeMs / c.signalSpeedNode;
+
+        out.push({
+            fromFrac: fromF,
+            toFrac: toF,
+            durationMs: dur,
+            strengthFrom: s.strength0,
+            strengthTo: s.strength1,
+            atpFrom: s.atpFrom,
+            atpTo: s.atpTo,
+            nodeFlash: !!s.nodeFlash,
+            segIndex: i,
+            kind: s.kind,
+            phase: s.phase
+        });
+    }
+    return out;
+}
+
+// Returns { ok, failReason, signalStrength, atp, voltage, steps, nodes, config, lowestSignalStrength }.
 function simulate(myelin, cfg) {
     var c = {};
     for (var key in defaultConfig)
@@ -60,118 +122,138 @@ function simulate(myelin, cfg) {
     var n = myelin.length;
     var steps = [];
     var nodes = buildRanvierNodeIndices(myelin);
-    var energy = c.startEnergy;
 
     if (n < 2) {
         return {
             ok: false,
-            energy: energy,
-            voltage: c.startVoltage,
-            peakVoltage: c.startVoltage,
-            steps: steps,
             failReason: "no_path",
+            signalStrength: 0,
+            atp: c.initialATP,
+            voltage: c.restingPotential,
+            peakVoltage: c.restingPotential,
+            steps: steps,
             nodes: nodes,
-            config: c
+            config: c,
+            lowestSignalStrength: 0
         };
     }
 
-    var V = c.startVoltage;
-    var peakV = V;
+    var strength = c.initialSignalStrength;
+    var atp = c.initialATP;
+    var lowest = strength;
 
-    for (var i = 0; i < n; i++) {
-        var kind = segmentKind(myelin, i, n);
-        var vBefore = V;
-
-        if (kind === "MYELIN")
-            V += c.myelinRelax;
-        else
-            V += c.ranvierDeepen;
-
-        if (V > peakV)
-            peakV = V;
-
-        // Every Ranvier NODE gets a pump/ion accent in playback (sequential nodes included).
-        var nodeFlash = kind === "NODE";
+    for (var k = 1; k < n; k++) {
+        var s0 = strength;
+        var dec = myelin[k] ? c.baseMyelinDecayPerUnit : c.baseUnmyelinatedDecayPerUnit;
+        var s1 = strength - dec;
 
         steps.push({
-            type: "segment",
-            index: i,
-            kind: kind,
-            vBefore: vBefore,
-            vAfter: V,
-            energyAfter: energy,
-            nodeFlash: nodeFlash,
-            regen: false
+            type: "hop",
+            phase: "decay",
+            index: k,
+            kind: myelin[k] ? "MYELIN" : "NODE",
+            strength0: s0,
+            strength1: s1,
+            atpFrom: atp,
+            atpTo: atp,
+            nodeFlash: false
         });
 
-        if (V >= c.failIfVoltageGte) {
+        strength = s1;
+        if (strength < lowest)
+            lowest = strength;
+
+        if (k === n - 1) {
+            if (strength < c.brainActivationThreshold) {
+                return {
+                    ok: false,
+                    failReason: "brain_weak",
+                    signalStrength: strength,
+                    atp: atp,
+                    voltage: strengthToDisplayVm(strength, c),
+                    peakVoltage: strengthToDisplayVm(lowest, c),
+                    steps: steps,
+                    nodes: nodes,
+                    config: c,
+                    lowestSignalStrength: lowest
+                };
+            }
             return {
-                ok: false,
-                energy: energy,
-                voltage: V,
-                peakVoltage: peakV,
+                ok: true,
+                failReason: "",
+                signalStrength: strength,
+                atp: atp,
+                voltage: strengthToDisplayVm(strength, c),
+                peakVoltage: strengthToDisplayVm(lowest, c),
                 steps: steps,
-                failReason: "collapsed",
                 nodes: nodes,
-                config: c
+                config: c,
+                lowestSignalStrength: lowest
             };
+        }
+
+        if (!myelin[k]) {
+            if (strength < c.signalThresholdToFireNode) {
+                return {
+                    ok: false,
+                    failReason: "faded_before_node",
+                    signalStrength: strength,
+                    atp: atp,
+                    voltage: strengthToDisplayVm(strength, c),
+                    peakVoltage: strengthToDisplayVm(lowest, c),
+                    steps: steps,
+                    nodes: nodes,
+                    config: c,
+                    lowestSignalStrength: lowest
+                };
+            }
+            if (atp < c.nodeATPcost) {
+                return {
+                    ok: false,
+                    failReason: "atp_exhausted",
+                    signalStrength: strength,
+                    atp: atp,
+                    voltage: strengthToDisplayVm(strength, c),
+                    peakVoltage: strengthToDisplayVm(lowest, c),
+                    steps: steps,
+                    nodes: nodes,
+                    config: c,
+                    lowestSignalStrength: lowest
+                };
+            }
+
+            var atpBefore = atp;
+            atp -= c.nodeATPcost;
+            var s2 = c.regeneratedSignalStrength;
+
+            steps.push({
+                type: "hop",
+                phase: "regen",
+                index: k,
+                kind: "NODE",
+                strength0: strength,
+                strength1: s2,
+                atpFrom: atpBefore,
+                atpTo: atp,
+                nodeFlash: true
+            });
+
+            strength = s2;
+            if (strength < lowest)
+                lowest = strength;
         }
     }
 
-    if (V > c.brainActivationThreshold) {
-        return {
-            ok: false,
-            energy: energy,
-            voltage: V,
-            peakVoltage: peakV,
-            steps: steps,
-            failReason: "insufficient_activation",
-            nodes: nodes,
-            config: c
-        };
-    }
-
     return {
-        ok: true,
-        energy: energy,
-        voltage: V,
-        peakVoltage: peakV,
+        ok: false,
+        failReason: "no_path",
+        signalStrength: strength,
+        atp: atp,
+        voltage: strengthToDisplayVm(strength, c),
+        peakVoltage: strengthToDisplayVm(lowest, c),
         steps: steps,
-        failReason: "",
         nodes: nodes,
-        config: c
+        config: c,
+        lowestSignalStrength: lowest
     };
-}
-
-function buildPlaybackTimeline(steps, n) {
-    var out = [];
-    if (!steps || n < 2)
-        return out;
-    for (var j = 0; j < steps.length; j++) {
-        var s = steps[j];
-        if (s.type !== "segment")
-            continue;
-        var i = s.index;
-        var fromF = (i + 0.1) / (n - 1);
-        var toF = (i + 0.92) / (n - 1);
-        if (i === n - 1)
-            toF = 1.0;
-        var dur = 280;
-        if (s.kind === "MYELIN")
-            dur = 240;
-        else if (s.kind === "NODE")
-            dur = s.nodeFlash ? 320 : 280;
-        out.push({
-            fromFrac: fromF,
-            toFrac: toF,
-            durationMs: dur,
-            vFrom: s.vBefore,
-            vTo: s.vAfter,
-            energyEnd: s.energyAfter,
-            nodeFlash: s.nodeFlash,
-            segIndex: i,
-            kind: s.kind
-        });
-    }
-    return out;
 }

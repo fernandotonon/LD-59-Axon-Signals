@@ -2,5 +2,6 @@
     <qresource prefix="/">
         <file alias="qml/main.qml">main.qml</file>
         <file alias="qml/js/signalSim.js">js/signalSim.js</file>
+        <file alias="qml/js/levels.js">js/levels.js</file>
     </qresource>
 </RCC>

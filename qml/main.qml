@@ -1,17 +1,17 @@
-// Axon Signals - negative Vm puzzle: Ranvier deepens Vm; myelin relaxes toward 0 mV; collapse if Vm >= 0.
-// Web Dojo: entry file; sibling js/signalSim.js.
+// Axon Signals - saltatory conduction puzzle (signal strength + ATP). Web Dojo: sibling js/signalSim.js.
 
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 import "js/signalSim.js" as SignalSim
+import "js/levels.js" as Levels
 
 ApplicationWindow {
     id: win
     visible: true
-    width: 960
-    height: 680
-    title: "Axon Signals - LD Prototype"
+    width: 980
+    height: 760
+    title: "Axon Signals"
     color: "#070910"
 
     property int segmentCount: 26
@@ -24,22 +24,39 @@ ApplicationWindow {
 
     property var myelin: []
     property var lastSim: ({
-        ok: false,
-        energy: 100,
+        ok: true,
+        signalStrength: 100,
+        atp: 8,
         voltage: -70,
         peakVoltage: -70,
+        lowestSignalStrength: 100,
         failReason: "",
         steps: [],
         nodes: [],
-        config: { startVoltage: -70, brainActivationThreshold: -55, failIfVoltageGte: 0 }
+        config: {
+            restingPotential: -70,
+            thresholdPotential: -55,
+            initialSignalStrength: 100,
+            brainActivationThreshold: 40,
+            signalThresholdToFireNode: 35
+        }
     })
-    property string statusLine: "Ranvier (gaps + ends) deepens Vm; myelin raises it toward 0 mV. Stay below 0 mV; reach the brain at or below -55 mV."
+    property string statusLine: ""
+
+    property int currentLevelIndex: 0
+    property int selectedPathIndex: 0
+    property var activePaths: []
+    property var pathMyelinCache: ({})
+    property bool pendingNextLevel: false
+    property string timePressureText: ""
 
     property bool playbackActive: false
     property real signalAlong: 0
     property real ionClock: 0
     property real playbackFailBlend: 0
-    property real displayVoltage: -55
+    property real displayVoltage: -70
+    property real displaySignalStrength: 100
+    property int displayAtp: 8
     property int nodeSpikeSeg: -1
     property real nodeSpikeBoost: 0
 
@@ -109,15 +126,91 @@ ApplicationWindow {
         axonIndices = a;
     }
 
-    function defaultMyelinPattern() {
-        var arr = [];
-        for (var i = 0; i < segmentCount; i++) {
-            if (i === 0 || i === segmentCount - 1)
-                arr.push(false);
-            else
-                arr.push(!!(i % 5 !== 0 && i % 5 !== 1));
+    function cacheKey() {
+        return currentLevelIndex + "_" + selectedPathIndex;
+    }
+
+    function mergedSim() {
+        if (!activePaths.length)
+            return Levels.mergeSim(Levels.getLevel(0), { initialATP: 10 });
+        return Levels.mergeSim(Levels.getLevel(currentLevelIndex), activePaths[selectedPathIndex]);
+    }
+
+    function saveMyelinToCache() {
+        var k = cacheKey();
+        var o = {};
+        for (var p in pathMyelinCache)
+            o[p] = pathMyelinCache[p];
+        o[k] = myelin.slice();
+        pathMyelinCache = o;
+    }
+
+    function selectPath(idx) {
+        if (idx === selectedPathIndex || idx < 0 || idx >= activePaths.length)
+            return;
+        saveMyelinToCache();
+        selectedPathIndex = idx;
+        var path = activePaths[idx];
+        segmentCount = path.segmentCount;
+        syncAxonIndices();
+        var k = cacheKey();
+        var snap = pathMyelinCache[k];
+        myelin = snap ? snap.slice() : path.defaultMyelin.slice();
+        stopPlayback();
+        refreshPreview();
+        pendingNextLevel = false;
+        statusLine = Levels.getLevel(currentLevelIndex).scenarioText + " (" + path.label + ")";
+    }
+
+    function applyLevel(idx) {
+        stopPlayback();
+        currentLevelIndex = idx;
+        selectedPathIndex = 0;
+        pathMyelinCache = {};
+        var L = Levels.getLevel(idx);
+        activePaths = L.paths;
+        title = "Axon Signals — " + L.title;
+        timePressureText = L.timePressureLabel;
+        var path0 = activePaths[0];
+        segmentCount = path0.segmentCount;
+        syncAxonIndices();
+        myelin = path0.defaultMyelin.slice();
+        pendingNextLevel = false;
+        refreshPreview();
+        statusLine = L.scenarioText + " Choose a path, adjust myelin, then Send Signal.";
+    }
+
+    function restartCurrentLevel() {
+        stopPlayback();
+        if (!activePaths.length)
+            return;
+        var path = activePaths[selectedPathIndex];
+        myelin = path.defaultMyelin.slice();
+        saveMyelinToCache();
+        refreshPreview();
+        var L = Levels.getLevel(currentLevelIndex);
+        statusLine = L.scenarioText + " Layout reset — try again.";
+        pendingNextLevel = false;
+    }
+
+    function goNextLevel() {
+        if (currentLevelIndex + 1 >= Levels.levelCount())
+            return;
+        applyLevel(currentLevelIndex + 1);
+    }
+
+    function pathMyelinByte(pathIdx, segIdx) {
+        if (pathIdx === selectedPathIndex) {
+            if (myelin && segIdx < myelin.length)
+                return !!myelin[segIdx];
         }
-        return arr;
+        var k2 = currentLevelIndex + "_" + pathIdx;
+        var arr = pathMyelinCache[k2];
+        if (!arr && activePaths[pathIdx])
+            arr = activePaths[pathIdx].defaultMyelin;
+        if (!arr || segIdx >= arr.length)
+            return false;
+        return !!arr[segIdx];
     }
 
     function stopPlayback() {
@@ -127,12 +220,13 @@ ApplicationWindow {
         playbackFailBlend = 0;
         nodeSpikeSeg = -1;
         nodeSpikeBoost = 0;
-        displayVoltage = (lastSim.config && lastSim.config.startVoltage !== undefined)
-                ? lastSim.config.startVoltage : -70;
+        displaySignalStrength = lastSim.signalStrength !== undefined ? lastSim.signalStrength : 100;
+        displayAtp = lastSim.atp !== undefined ? lastSim.atp : 8;
+        displayVoltage = lastSim.voltage !== undefined ? lastSim.voltage : -70;
     }
 
     function startSignalPlayback() {
-        playTimer.timeline = SignalSim.buildPlaybackTimeline(lastSim.steps, segmentCount);
+        playTimer.timeline = SignalSim.buildPlaybackTimeline(lastSim.steps, segmentCount, lastSim.config);
         playTimer.legIndex = 0;
         playTimer.legU = 0;
         if (playTimer.timeline.length === 0) {
@@ -141,55 +235,44 @@ ApplicationWindow {
         }
         playbackActive = true;
         playbackFailBlend = 0;
-        displayVoltage = playTimer.timeline[0].vFrom;
+        var leg0 = playTimer.timeline[0];
+        displaySignalStrength = leg0.strengthFrom;
+        displayAtp = leg0.atpFrom;
+        displayVoltage = SignalSim.strengthToDisplayVm(displaySignalStrength, lastSim.config);
         playTimer.running = true;
     }
 
-    function resetLevel() {
-        stopPlayback();
-        myelin = defaultMyelinPattern();
-        refreshPreview();
-        statusLine = "Foot -> Brain: Ranvier nodes deepen Vm (more negative); myelin raises it toward 0. Never reach 0 mV.";
-    }
-
     function refreshPreview() {
-        lastSim = SignalSim.simulate(myelin, null);
+        lastSim = SignalSim.simulate(myelin, mergedSim());
     }
 
     Component.onCompleted: {
-        syncAxonIndices();
-        resetLevel();
+        applyLevel(0);
     }
 
     onSegmentCountChanged: syncAxonIndices()
 
     onMyelinChanged: {
-        if (!playbackActive)
+        if (!playbackActive) {
+            saveMyelinToCache();
             refreshPreview();
+        }
     }
 
     function describeFail(code) {
-        if (code === "collapsed")
-            return "Signal collapsed (voltage reached 0)";
-        if (code === "insufficient_activation")
+        if (code === "faded_before_node")
+            return "Signal faded before the next node";
+        if (code === "atp_exhausted")
+            return "Not enough ATP to regenerate signal";
+        if (code === "brain_weak")
             return "Signal too weak to activate Brain";
         if (code === "no_path")
-            return "axon layout invalid.";
-        return "propagation failed.";
+            return "Axon layout invalid.";
+        return "Propagation failed.";
     }
 
     function smoothstep(u) {
         return u * u * (3 - 2 * u);
-    }
-
-    // More negative Vm -> stronger pulse (1). Near 0 mV -> weak (approaches 0).
-    function signalStrengthFromV(vm) {
-        return Math.max(0.12, Math.min(1.0, (-vm) / 80.0));
-    }
-
-    // 0 = safe negative Vm; rises toward 1 as Vm approaches 0 from below (collapse risk).
-    function collapseRiskFromV(vm) {
-        return Math.max(0, Math.min(1, (vm + 16) / 16.0));
     }
 
     Timer {
@@ -218,7 +301,9 @@ ApplicationWindow {
             legU += (interval / leg.durationMs) * stepScale;
             var sm = win.smoothstep(Math.min(1, legU));
             win.signalAlong = leg.fromFrac + (leg.toFrac - leg.fromFrac) * sm;
-            win.displayVoltage = leg.vFrom + (leg.vTo - leg.vFrom) * sm;
+            win.displaySignalStrength = leg.strengthFrom + (leg.strengthTo - leg.strengthFrom) * sm;
+            win.displayAtp = Math.round(leg.atpFrom + (leg.atpTo - leg.atpFrom) * sm);
+            win.displayVoltage = SignalSim.strengthToDisplayVm(win.displaySignalStrength, win.lastSim.config);
 
             if (leg.nodeFlash) {
                 win.nodeSpikeBoost = Math.max(0, 1 - Math.abs(legU - 0.5) * 2.35);
@@ -235,25 +320,40 @@ ApplicationWindow {
                 win.nodeSpikeSeg = -1;
                 if (legIndex >= timeline.length) {
                     win.signalAlong = 1.0;
+                    win.displaySignalStrength = win.lastSim.signalStrength;
+                    win.displayAtp = win.lastSim.atp;
                     win.displayVoltage = win.lastSim.voltage;
                     win.playbackActive = false;
                     running = false;
                     if (win.lastSim.ok) {
                         var thr = (win.lastSim.config && win.lastSim.config.brainActivationThreshold !== undefined)
-                                ? win.lastSim.config.brainActivationThreshold : -55;
-                        win.statusLine = "Success - Vm reached the brain at or below "
-                                + Math.round(thr * 10) / 10 + " mV without collapsing.";
+                                ? win.lastSim.config.brainActivationThreshold : 40;
+                        var L = Levels.getLevel(win.currentLevelIndex);
+                        win.statusLine = L.successFeedback + " Strength "
+                                + Math.round(win.lastSim.signalStrength) + " (needed >= " + Math.round(thr) + ").";
+                        if (win.currentLevelIndex + 1 >= Levels.levelCount()) {
+                            win.statusLine += " All scenarios cleared!";
+                            win.pendingNextLevel = false;
+                        } else {
+                            win.pendingNextLevel = true;
+                        }
+                    } else {
+                        var Lf = Levels.getLevel(win.currentLevelIndex);
+                        win.statusLine = Lf.failFeedback + " (" + win.describeFail(win.lastSim.failReason) + ")";
+                        win.pendingNextLevel = false;
                     }
-                    else
-                        win.statusLine = "Failed - " + win.describeFail(win.lastSim.failReason);
                     win.refreshPreview();
                     return;
                 }
                 leg = timeline[legIndex];
-                win.displayVoltage = leg.vFrom;
+                win.displaySignalStrength = leg.strengthFrom;
+                win.displayAtp = leg.atpFrom;
+                win.displayVoltage = SignalSim.strengthToDisplayVm(leg.strengthFrom, win.lastSim.config);
             }
-            if (!win.lastSim.ok && leg.kind !== "MYELIN"
-                    && win.collapseRiskFromV(win.displayVoltage) > 0.25)
+            var cap = (win.lastSim.config && win.lastSim.config.initialSignalStrength)
+                    ? win.lastSim.config.initialSignalStrength : 100;
+            var risk = 1.0 - Math.max(0, Math.min(1, win.displaySignalStrength / cap));
+            if (!win.lastSim.ok && leg.phase !== "decay" && risk > 0.28)
                 win.playbackFailBlend = Math.min(1, win.playbackFailBlend + 0.045);
             else if (!win.lastSim.ok && legIndex >= timeline.length - 1)
                 win.playbackFailBlend = Math.min(1, win.playbackFailBlend + 0.02);
@@ -354,36 +454,52 @@ ApplicationWindow {
                 font.pixelSize: 24
                 font.bold: true
             }
+            Button {
+                text: "Neuron rules"
+                font.pixelSize: 11
+                flat: true
+                onClicked: howDrawer.open()
+            }
             Item { Layout.fillWidth: true }
             Label {
-                text: "Start: <b>" + ((lastSim.config && lastSim.config.startVoltage !== undefined)
-                        ? Math.round(lastSim.config.startVoltage * 10) / 10 : -70) + " mV</b>"
+                text: "Strength: <b>" + Math.round(win.playbackActive ? win.displaySignalStrength : win.lastSim.signalStrength) + "</b>"
                 color: "#9fd7ff"
                 textFormat: Text.RichText
                 font.pixelSize: 12
             }
             Label {
-                text: "Brain need <b>" + ((lastSim.config && lastSim.config.brainActivationThreshold !== undefined)
-                        ? Math.round(lastSim.config.brainActivationThreshold * 10) / 10 : -55) + " mV</b>"
-                color: "#d49bff"
+                text: "ATP: <b>" + (win.playbackActive ? win.displayAtp : win.lastSim.atp) + "</b>"
+                color: "#7cf5c6"
                 textFormat: Text.RichText
                 font.pixelSize: 12
             }
             Label {
-                text: "Vm: <b>" + Math.round((win.playbackActive ? win.displayVoltage : win.lastSim.voltage) * 10) / 10 + " mV</b>"
-                color: "#7cf5c6"
-                textFormat: Text.RichText
-                font.pixelSize: 13
-            }
-            Label {
-                text: "Peak->0: <b>" + Math.round(lastSim.peakVoltage * 10) / 10 + " mV</b>"
-                color: "#c8b8ff"
+                text: "Brain: <b>≥ " + Math.round(Levels.getLevel(currentLevelIndex).brainActivationThreshold)
+                        + " mV</b> · str ≥ <b>"
+                        + ((lastSim.config && lastSim.config.brainActivationThreshold !== undefined)
+                           ? Math.round(lastSim.config.brainActivationThreshold) : 40) + "</b>"
+                color: "#d49bff"
                 textFormat: Text.RichText
                 font.pixelSize: 11
             }
             Label {
-                text: "End Vm: <b>" + Math.round(lastSim.voltage * 10) / 10 + " mV</b>"
+                text: "~Vm: <b>" + Math.round((win.playbackActive ? win.displayVoltage : win.lastSim.voltage) * 10) / 10 + " mV</b>"
                 color: "#8ec5ff"
+                textFormat: Text.RichText
+                font.pixelSize: 11
+            }
+            Label {
+                text: "Rest/Thr: <b>" + ((lastSim.config && lastSim.config.restingPotential !== undefined)
+                        ? Math.round(lastSim.config.restingPotential) : -70) + " / "
+                        + ((lastSim.config && lastSim.config.thresholdPotential !== undefined)
+ ? Math.round(lastSim.config.thresholdPotential) : -55) + " mV</b>"
+                color: "#9aa8c0"
+                textFormat: Text.RichText
+                font.pixelSize: 10
+            }
+            Label {
+                text: "Weakest: <b>" + Math.round(lastSim.lowestSignalStrength !== undefined ? lastSim.lowestSignalStrength : lastSim.signalStrength) + "</b>"
+                color: "#c8b8ff"
                 textFormat: Text.RichText
                 font.pixelSize: 11
             }
@@ -421,6 +537,134 @@ ApplicationWindow {
                     onClicked: win.showDidYouKnow("signal")
                     onEntered: win.armDykHover("signal")
                     onExited: win.disarmDykHover("signal")
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true
+            spacing: 10
+            Label {
+                text: "Level " + (currentLevelIndex + 1) + " / " + Levels.levelCount()
+                color: "#7ad8ff"
+                font.bold: true
+                font.pixelSize: 12
+            }
+            ColumnLayout {
+                Layout.fillWidth: true
+                spacing: 2
+                Label {
+                    text: Levels.getLevel(currentLevelIndex).title
+                    color: "#e8f6ff"
+                    font.pixelSize: 18
+                    font.bold: true
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+                Label {
+                    text: Levels.getLevel(currentLevelIndex).scenarioText
+                    color: "#9aa8c0"
+                    font.pixelSize: 12
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+                Label {
+                    text: {
+                        var L = Levels.getLevel(currentLevelIndex);
+                        "Scenario tuning: " + L.startVoltage + " mV start · node penalty +"
+                                + L.nodePenalty + " · myelin loss " + Math.abs(L.myelinBoost)
+                                + "/myelin seg · brain ≤ " + L.brainActivationThreshold + " mV";
+                    }
+                    color: "#5c6578"
+                    font.pixelSize: 10
+                    Layout.fillWidth: true
+                    wrapMode: Text.WordWrap
+                }
+            }
+        }
+
+        Label {
+            Layout.fillWidth: true
+            text: timePressureText
+            wrapMode: Text.WordWrap
+            color: "#ffb070"
+            font.pixelSize: 11
+            font.italic: true
+            opacity: 0.55 + 0.45 * Math.abs(Math.sin(ionClock * 1.65))
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            Label {
+                text: "Paths — tap one to select"
+                color: "#7a8699"
+                font.pixelSize: 11 }
+            Repeater {
+                model: activePaths
+                delegate: Rectangle {
+                    property int pathIdx: index
+                    property var pathItem: modelData
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 64
+                    radius: 8
+                    color: pathIdx === selectedPathIndex ? "#101a2a" : "#080d14"
+                    border.width: pathIdx === selectedPathIndex ? 2 : 1
+                    border.color: pathIdx === selectedPathIndex ? "#4dd4b0" : "#2a3850"
+
+                    RowLayout {
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        spacing: 10
+
+                        Rectangle {
+                            Layout.preferredWidth: 10
+                            Layout.preferredHeight: 10
+                            radius: 5
+                            color: pathIdx === selectedPathIndex ? "#4dd4b0" : "#3a4a60"
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Label {
+                                text: pathItem.label
+                                color: "#e8f6ff"
+                                font.pixelSize: 12
+                                font.bold: true
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                            }
+                            Label {
+                                text: pathItem.hint
+                                color: "#7a8699"
+                                font.pixelSize: 10
+                                Layout.fillWidth: true
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        Row {
+                            spacing: 2
+                            Layout.alignment: Qt.AlignVCenter
+                            Repeater {
+                                model: pathItem.segmentCount
+                                Rectangle {
+                                    width: 3
+                                    height: 22
+                                    radius: 1
+                                    color: pathMyelinByte(pathIdx, index) ? "#2d9a58" : "#b65c20"
+                                }
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: selectPath(pathIdx)
+                    }
                 }
             }
         }
@@ -497,9 +741,12 @@ ApplicationWindow {
                                         axonIndex - win.signalAlong * (win.segmentCount - 1))
                                     readonly property bool nearPulse: win.playbackActive && sigDist < 0.95
 
-                                    readonly property real vmRef: win.playbackActive ? win.displayVoltage : win.lastSim.voltage
-                                    readonly property real sigStrength: win.signalStrengthFromV(vmRef)
-                                    readonly property real collapseRisk: win.collapseRiskFromV(vmRef)
+                                    readonly property real liveStrength: win.playbackActive ? win.displaySignalStrength : win.lastSim.signalStrength
+                                    readonly property real strCap: (win.lastSim.config && win.lastSim.config.initialSignalStrength)
+                                            ? win.lastSim.config.initialSignalStrength : 100
+                                    readonly property real normStrength: Math.max(0, Math.min(1, liveStrength / strCap))
+                                    readonly property real sigStrength: 0.15 + 0.85 * normStrength
+                                    readonly property real collapseRisk: 1.0 - normStrength
                                     readonly property real pulseBase: {
                                         if (!win.playbackActive)
                                             return 0;
@@ -509,19 +756,20 @@ ApplicationWindow {
                                     }
                                     readonly property real spikeBoost: (win.nodeSpikeSeg === axonIndex) ? win.nodeSpikeBoost * 0.95 : 0
                                     readonly property real pulseGlow: {
-                                        // No high-frequency flicker on MYELIN - calmer propagation leg.
-                                        var flick = (!isMyelin && collapseRisk > 0.2)
-                                                ? 0.14 * collapseRisk * Math.abs(Math.sin(win.ionClock * 10.7))
+                                        var flickNode = (!isMyelin && collapseRisk > 0.22)
+                                                ? (0.1 + 0.22 * collapseRisk) * Math.abs(Math.sin(win.ionClock * (9.5 + 10 * collapseRisk)))
                                                 : 0;
-                                        return pulseBase * sigStrength * (1 - 0.62 * collapseRisk) * (1 - 0.45 * win.playbackFailBlend) + spikeBoost + flick;
+                                        var flickMyelin = isMyelin ? 0.04 * Math.sin(win.ionClock * 2.2) : 0;
+                                        var flick = isMyelin ? flickMyelin : flickNode;
+                                        return pulseBase * sigStrength * (1 - 0.58 * collapseRisk) * (1 - 0.45 * win.playbackFailBlend) + spikeBoost + flick;
                                     }
 
                                     Rectangle {
                                         z: 0
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.verticalCenter: parent.verticalCenter
-                                        width: isMyelin ? 24 : 22
-                                        height: 100
+                                        width: (isMyelin ? 24 : 22) * (0.9 + 0.1 * normStrength)
+                                        height: 100 * (0.94 + 0.06 * normStrength)
                                         radius: 9
                                         border.width: isMyelin ? 1 : 3
                                         border.color: isMyelin ? "#1e3a28" : "#ff9933"
@@ -874,16 +1122,26 @@ ApplicationWindow {
                 enabled: !win.playbackActive
                 onClicked: {
                     win.stopPlayback();
-                    win.lastSim = SignalSim.simulate(win.myelin, null);
-                    win.statusLine = win.lastSim.ok
-                            ? "Send: keep Vm below 0 mV and finish the brain at or below -55 mV."
-                            : "Risk: too much myelin raises Vm toward 0; add Ranvier stretches to deepen it again before collapse.";
+                    win.lastSim = SignalSim.simulate(win.myelin, win.mergedSim());
+                    win.pendingNextLevel = false;
+                    if (!win.lastSim.ok) {
+                        win.statusLine = Levels.getLevel(win.currentLevelIndex).scenarioText + " — "
+                                + win.describeFail(win.lastSim.failReason);
+                    } else {
+                        win.statusLine = "Propagating…";
+                    }
                     win.startSignalPlayback();
                 }
             }
             Button {
-                text: "Reset"
-                onClicked: win.resetLevel()
+                text: "Restart level"
+                onClicked: win.restartCurrentLevel()
+            }
+            Button {
+                text: "Next level"
+                visible: win.pendingNextLevel && win.currentLevelIndex + 1 < Levels.levelCount()
+                enabled: !win.playbackActive
+                onClicked: win.goNextLevel()
             }
             Button {
                 text: win.learningMode ? "Learning: ON" : "Learning: OFF"
@@ -896,11 +1154,101 @@ ApplicationWindow {
                 }
             }
             Label {
-                text: "Click interior cells to toggle myelin. Every Ranvier node (non-myelin) shows stripes, pumps, and ions. Track width scales with segment count."
+                text: "Click interior cells to toggle myelin. Nodes regenerate the signal (ATP cost); myelin reduces loss between nodes."
                 color: "#7a8699"
                 font.pixelSize: 11
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
+            }
+        }
+    }
+
+    Drawer {
+        id: howDrawer
+        edge: Qt.RightEdge
+        width: Math.min(440, win.width * 0.48)
+        height: win.height
+        background: Rectangle {
+            color: "#080c16"
+            border.width: 1
+            border.color: "#223047"
+        }
+
+        ScrollView {
+            anchors.fill: parent
+            anchors.margins: 1
+            clip: true
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+
+            Column {
+                width: howDrawer.width - 28
+                spacing: 12
+                topPadding: 18
+                leftPadding: 16
+                rightPadding: 16
+                bottomPadding: 24
+
+                Label {
+                    width: parent.width
+                    text: "How Axon Signals Works"
+                    wrapMode: Text.WordWrap
+                    color: "#e8f6ff"
+                    font.pixelSize: 20
+                    font.bold: true
+                }
+
+                Label {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    color: "#b8c7dd"
+                    font.pixelSize: 12
+                    text: "The signal starts strong at a Ranvier node.\n"
+                          + "Myelin helps the signal travel farther with less loss.\n"
+                          + "Ranvier nodes regenerate the signal.\n"
+                          + "Each node activation uses ATP.\n"
+                          + "If the signal becomes too weak before the next node, it stops.\n"
+                          + "If you use too many nodes, you may run out of ATP.\n"
+                          + "Reach the Brain with enough strength to succeed."
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: "#223047"
+                }
+
+                Label {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    color: "#8fa6c4"
+                    font.pixelSize: 11
+                    font.italic: true
+                    text: "Science note: Real neurons are more complex. This game uses a simplified model inspired by saltatory conduction, where signals travel quickly under myelin and are regenerated at nodes of Ranvier."
+                }
+
+                Label {
+                    width: parent.width
+                    text: "Did you know?"
+                    color: "#7ad8ff"
+                    font.pixelSize: 13
+                    font.bold: true
+                }
+
+                Label {
+                    width: parent.width
+                    wrapMode: Text.WordWrap
+                    color: "#9aa8c0"
+                    font.pixelSize: 11
+                    text: "Resting membrane potential is typically around -70 mV.\n"
+                          + "A neuron usually fires when it reaches about -55 mV.\n"
+                          + "Myelin helps signals travel faster and farther.\n"
+                          + "Nodes of Ranvier are gaps where the action potential is regenerated."
+                }
+
+                Button {
+                    text: "Close"
+                    onClicked: howDrawer.close()
+                }
             }
         }
     }
