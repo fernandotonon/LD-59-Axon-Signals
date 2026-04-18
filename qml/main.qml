@@ -1,9 +1,10 @@
 // Axon Signals — negative Vm puzzle: nodes pull toward 0 mV, myelin re-deepens; collapse if Vm ≥ 0.
 // Web Dojo: entry file; sibling js/signalSim.js.
 
-import QtQuick 2.12
-import QtQuick.Controls 2.12
-import QtQuick.Layouts 1.12
+// Match Web Dojo WASM (same as commit 4d133a1 — Qt 2.12 imports fail to load there).
+import QtQuick 2.15
+import QtQuick.Controls 2.15
+import QtQuick.Layouts 1.15
 import "js/signalSim.js" as SignalSim
 
 ApplicationWindow {
