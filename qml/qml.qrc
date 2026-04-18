@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/">
+        <file alias="qml/main.qml">main.qml</file>
+        <file alias="qml/Playback3D.qml">Playback3D.qml</file>
+        <file alias="qml/js/signalSim.js">js/signalSim.js</file>
+    </qresource>
+</RCC>
