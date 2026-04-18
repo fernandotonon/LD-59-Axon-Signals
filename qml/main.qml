@@ -60,7 +60,7 @@ ApplicationWindow {
     property int nodeSpikeSeg: -1
     property real nodeSpikeBoost: 0
 
-    property bool learningMode: true
+    property bool learningMode: false
     property string dykPanelText: ""
     readonly property var didYouKnowFacts: ({
         "myelin": "Did you know? Myelin acts as insulation, allowing signals to travel faster along neurons.",
@@ -681,7 +681,7 @@ ApplicationWindow {
             Layout.fillWidth: true
             spacing: 8
             Label {
-                text: "Foot"
+                text: Levels.getLevel(currentLevelIndex).startOrgan
                 color: "#5bd0ff"
                 font.bold: true
                 font.pixelSize: 12
@@ -984,7 +984,8 @@ ApplicationWindow {
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
                                         anchors.bottomMargin: 1
-                                        text: axonIndex === 0 ? "F" : (axonIndex === win.segmentCount - 1 ? "B" : "")
+                                        text: axonIndex === 0 ? Levels.getLevel(win.currentLevelIndex).startMarker
+                                                             : (axonIndex === win.segmentCount - 1 ? "B" : "")
                                         color: "#9fe8ff"
                                         font.pixelSize: 8
                                     }

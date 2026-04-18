@@ -1,83 +1,14 @@
 // Level progression: narrative scenarios + per-path axon layouts.
 // Design fields (startVoltage, nodePenalty, myelinBoost, brainActivationThreshold mV) map into
-// signalSim.js numeric config (signalStrength, ATP, decay) via each level's `sim` block.
+// signalSim.js numeric config via each level's `sim` block.
+// Every path starts fully myelinated; players strip myelin to place Ranvier nodes.
 .pragma library
 
-function _arr() {
+// Myelin = true, Ranvier gap = false. Endpoints stay nodes (false); interior starts all myelin.
+function fullMyelin(n) {
     var a = [];
-    for (var i = 0; i < arguments.length; i++)
-        a.push(!!arguments[i]);
-    return a;
-}
-
-// Myelin = true, Ranvier gap = false. Ends are always nodes (false).
-function patternTutorial(n) {
-    // Easy: short runs of myelin, nodes every ~3 segments.
-    if (n === 12)
-        return _arr(0, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0);
-    return patternBalanced(n, 3);
-}
-
-// Few interior nodes → long myelinated gaps (risky).
-function patternRiskyGaps(n) {
-    var a = [];
-    for (var i = 0; i < n; i++) {
-        if (i === 0 || i === n - 1)
-            a.push(false);
-        else if (i === Math.floor(n * 0.35) || i === Math.floor(n * 0.72))
-            a.push(false);
-        else
-            a.push(true);
-    }
-    return a;
-}
-
-// More nodes → safer hops, higher ATP use.
-function patternSafeManyNodes(n) {
-    var a = [];
-    for (var i = 0; i < n; i++) {
-        if (i === 0 || i === n - 1)
-            a.push(false);
-        else
-            a.push(i % 2 === 1);
-    }
-    return a;
-}
-
-function patternBalanced(n, every) {
-    var a = [];
-    for (var i = 0; i < n; i++) {
-        if (i === 0 || i === n - 1)
-            a.push(false);
-        else
-            a.push(i % every !== 0);
-    }
-    return a;
-}
-
-// Too many nodes: node every 2 segments (ATP drain on hard levels).
-function patternTooManyNodes(n) {
-    var a = [];
-    for (var i = 0; i < n; i++) {
-        if (i === 0 || i === n - 1)
-            a.push(false);
-        else
-            a.push(i % 2 === 0);
-    }
-    return a;
-}
-
-// Long gaps: only2 interior regeneration points.
-function patternLongGaps(n) {
-    var a = [];
-    for (var i = 0; i < n; i++) {
-        if (i === 0 || i === n - 1)
-            a.push(false);
-        else if (i === Math.floor(n / 3) || i === Math.floor(2 * n / 3))
-            a.push(false);
-        else
-            a.push(true);
-    }
+    for (var i = 0; i < n; i++)
+        a.push(i !== 0 && i !== n - 1);
     return a;
 }
 
@@ -89,6 +20,8 @@ var LEVELS = [
         timePressureLabel: "The truck is rolling away — there is not much time…",
         successFeedback: "You got the ice cream! \uD83C\uDF66",
         failFeedback: "The truck drove away...",
+        startOrgan: "Ear",
+        startMarker: "E",
         startVoltage: -70,
         nodePenalty: 10,
         myelinBoost: -6,
@@ -111,10 +44,10 @@ var LEVELS = [
             {
                 id: "tutorial",
                 label: "Quick ear-to-brain route",
-                hint: "Short axon — practice myelin vs nodes.",
+                hint: "Short hop — tight timing; sheath starts intact end to end.",
                 segmentCount: 12,
                 initialATP: 12,
-                defaultMyelin: patternTutorial(12)
+                defaultMyelin: fullMyelin(12)
             }
         ]
     },
@@ -125,6 +58,8 @@ var LEVELS = [
         timePressureLabel: "Your hand is still on the heat — react quickly!",
         successFeedback: "You pulled your hand away in time! \uD83D\uDD25",
         failFeedback: "Too slow... it burned!",
+        startOrgan: "Hand",
+        startMarker: "H",
         startVoltage: -70,
         nodePenalty: 12,
         myelinBoost: -6,
@@ -147,18 +82,18 @@ var LEVELS = [
             {
                 id: "risky",
                 label: "Fast shortcut (risky gaps)",
-                hint: "Fewer nodes — saves ATP but long jumps may kill the signal.",
+                hint: "Fewer segments; long exposed runs bleed strength quickly.",
                 segmentCount: 14,
                 initialATP: 11,
-                defaultMyelin: patternRiskyGaps(14)
+                defaultMyelin: fullMyelin(14)
             },
             {
                 id: "safe",
                 label: "Longer safe route",
-                hint: "More nodes regenerate the signal; watch your ATP budget.",
+                hint: "More segments and ATP — each regen costs energy.",
                 segmentCount: 20,
                 initialATP: 14,
-                defaultMyelin: patternSafeManyNodes(20)
+                defaultMyelin: fullMyelin(20)
             }
         ]
     },
@@ -169,6 +104,8 @@ var LEVELS = [
         timePressureLabel: "One more step — choose the right nerve path!",
         successFeedback: "You avoided the nail! \uD83E\uDEB6",
         failFeedback: "Ouch! Too late...",
+        startOrgan: "Eye",
+        startMarker: "I",
         startVoltage: -70,
         nodePenalty: 14,
         myelinBoost: -6,
@@ -191,26 +128,26 @@ var LEVELS = [
             {
                 id: "optimal",
                 label: "Balanced path",
-                hint: "Spacing and myelin are tuned for saltatory hopping.",
+                hint: "Balanced length and starting ATP.",
                 segmentCount: 18,
                 initialATP: 13,
-                defaultMyelin: patternBalanced(18, 4)
+                defaultMyelin: fullMyelin(18)
             },
             {
                 id: "drain",
-                label: "Too many nodes",
-                hint: "Lots of regeneration — may exhaust ATP before the brain.",
+                label: "Long path, tight ATP",
+                hint: "Same length as balanced; slightly leaner ATP pool.",
                 segmentCount: 18,
                 initialATP: 12,
-                defaultMyelin: patternTooManyNodes(18)
+                defaultMyelin: fullMyelin(18)
             },
             {
                 id: "gaps",
-                label: "Long dangerous gaps",
-                hint: "Myelin runs are very long between nodes.",
+                label: "Wide axon",
+                hint: "Same 18 segments and ATP as drain — alternate run with identical numbers.",
                 segmentCount: 18,
                 initialATP: 12,
-                defaultMyelin: patternLongGaps(18)
+                defaultMyelin: fullMyelin(18)
             }
         ]
     },
@@ -221,6 +158,8 @@ var LEVELS = [
         timePressureLabel: "The ball is closing distance — pick a path and send the signal!",
         successFeedback: "Nice catch! \u26BE",
         failFeedback: "You got hit!",
+        startOrgan: "Hand",
+        startMarker: "H",
         startVoltage: -70,
         nodePenalty: 15,
         myelinBoost: -5,
@@ -243,26 +182,26 @@ var LEVELS = [
             {
                 id: "long",
                 label: "Long stable arc",
-                hint: "Distance costs decay — generous nodes help.",
+                hint: "Long axon; more room to tune, more places to lose the wave.",
                 segmentCount: 24,
                 initialATP: 16,
-                defaultMyelin: patternBalanced(24, 4)
+                defaultMyelin: fullMyelin(24)
             },
             {
                 id: "short",
                 label: "Short but brutal",
-                hint: "Few hops, huge gaps — expert myelin edits needed.",
+                hint: "Short axon; each exposed step hurts more.",
                 segmentCount: 15,
                 initialATP: 11,
-                defaultMyelin: patternRiskyGaps(15)
+                defaultMyelin: fullMyelin(15)
             },
             {
                 id: "mid",
                 label: "Middle compromise",
-                hint: "Balanced length and node spacing.",
+                hint: "Middle length and ATP — jack of all trades.",
                 segmentCount: 19,
                 initialATP: 14,
-                defaultMyelin: patternBalanced(19, 3)
+                defaultMyelin: fullMyelin(19)
             }
         ]
     },
@@ -273,6 +212,8 @@ var LEVELS = [
         timePressureLabel: "Your stomach is deciding — signal the brain before you take a bite!",
         successFeedback: "You avoided eating spoiled food! \uD83E\uDD22",
         failFeedback: "Too late... that was a bad idea.",
+        startOrgan: "Nose",
+        startMarker: "N",
         startVoltage: -70,
         nodePenalty: 16,
         myelinBoost: -5,
@@ -295,26 +236,26 @@ var LEVELS = [
             {
                 id: "marathon",
                 label: "Very long, steady",
-                hint: "Maximum distance — plan nodes carefully.",
+                hint: "Maximum distance; small mistakes echo down the whole axon.",
                 segmentCount: 26,
                 initialATP: 17,
-                defaultMyelin: patternBalanced(26, 4)
+                defaultMyelin: fullMyelin(26)
             },
             {
                 id: "volatile",
                 label: "Short & unstable",
-                hint: "Quick path with nasty gaps.",
+                hint: "Fewer segments; brain wants a stronger arrival.",
                 segmentCount: 16,
                 initialATP: 12,
-                defaultMyelin: patternRiskyGaps(16)
+                defaultMyelin: fullMyelin(16)
             },
             {
                 id: "tricky",
                 label: "Tricky optimal",
-                hint: "Looks innocent — needs tight myelin placement.",
+                hint: "Mid length; sharp thresholds — little margin for sloppy hops.",
                 segmentCount: 22,
                 initialATP: 14,
-                defaultMyelin: patternLongGaps(22)
+                defaultMyelin: fullMyelin(22)
             }
         ]
     }
@@ -330,7 +271,6 @@ function getLevel(index) {
     return LEVELS[index];
 }
 
-// Merge level sim with per-path ATP override (and optional path.simExtra).
 function mergeSim(level, path) {
     var out = {};
     if (!level || !level.sim) {
