@@ -1,66 +1,49 @@
-// signalSim.js — pure simulation for saltatory conduction along a discretized axon.
-// Kept free of QML dependencies so the same logic can be unit-tested or reused by Clayground.
-
+// signalSim.js — simplified membrane potential + ATP (game-readable, not biophysical).
 .pragma library
 
 var defaultConfig = {
-    maxJump: 7,
+    regenVmV: -55,
+    failVmV: -70,
+    startVmV: -55,
     startEnergy: 100,
-    // Per-segment jump baseline (scaled by distance and myelin fraction).
-    jumpCostBase: 3.2,
-    // Myelin reduces effective jump cost (saltatory conduction is efficient).
-    myelinEfficiency: 0.62,
-    // Extra penalty when the exposed "gap" between nodes is wide (leaky membrane feel).
-    exposedGapPenalty: 1.4,
-    // Global leak: too many exposed internode segments taxes the system.
-    exposedDensityTax: 0.35
+    decayMyelinMv: 3.0,
+    decayLeakyMv: 9.0,
+    nodeAtpCost: 14
 };
 
-function buildNodeIndices(myelin) {
+// MYELIN = internode sheath; NODE = foot, brain, or true gap between myelin; LEAKY = exposed but not a Ranvier gap.
+function segmentKind(myelin, i, n) {
+    if (i < 0 || i >= n)
+        return "INVALID";
+    if (myelin[i])
+        return "MYELIN";
+    if (i === 0 || i === n - 1)
+        return "NODE";
+    if (myelin[i - 1] && myelin[i + 1])
+        return "NODE";
+    return "LEAKY";
+}
+
+function isRanvierNode(myelin, i, n) {
+    return segmentKind(myelin, i, n) === "NODE";
+}
+
+// Kept for tooling / QML; lists indices where pumps may appear (all NODE kinds).
+function buildRanvierNodeIndices(myelin) {
     var n = myelin.length;
-    var nodes = [];
-    nodes.push(0);
-    for (var i = 1; i < n - 1; i++) {
-        if (!myelin[i])
-            nodes.push(i);
-    }
-    nodes.push(n - 1);
-    nodes.sort(function (a, b) { return a - b; });
     var out = [];
-    for (var k = 0; k < nodes.length; k++) {
-        if (k === 0 || nodes[k] !== nodes[k - 1])
-            out.push(nodes[k]);
+    for (var i = 0; i < n; i++) {
+        if (isRanvierNode(myelin, i, n))
+            out.push(i);
     }
     return out;
 }
 
-function countMyelinBetween(myelin, fromIdx, toIdx) {
-    var c = 0;
-    var lo = Math.min(fromIdx, toIdx) + 1;
-    var hi = Math.max(fromIdx, toIdx) - 1;
-    for (var i = lo; i <= hi; i++) {
-        if (myelin[i])
-            c++;
-    }
-    return c;
-}
-
-function countExposedInterior(myelin) {
-    var n = myelin.length;
-    var c = 0;
-    for (var i = 1; i < n - 1; i++) {
-        if (!myelin[i])
-            c++;
-    }
-    return c;
-}
-
-// Returns { ok, energy, steps, failReason } where steps is an array of leg summaries.
+// Returns { ok, energy, voltage, minVoltage, steps, failReason, nodes, config }.
 function simulate(myelin, cfg) {
     var c = {};
-    for (var key in defaultConfig) {
+    for (var key in defaultConfig)
         c[key] = defaultConfig[key];
-    }
     if (cfg) {
         for (var k in cfg) {
             if (cfg.hasOwnProperty(k))
@@ -69,15 +52,16 @@ function simulate(myelin, cfg) {
     }
 
     var n = myelin.length;
-    var energy = c.startEnergy;
-    var nodes = buildNodeIndices(myelin);
     var steps = [];
     var failReason = "";
+    var nodes = buildRanvierNodeIndices(myelin);
 
-    if (nodes.length < 2) {
+    if (n < 2) {
         return {
             ok: false,
-            energy: energy,
+            energy: c.startEnergy,
+            voltage: c.startVmV,
+            minVoltage: c.startVmV,
             steps: steps,
             failReason: "no_path",
             nodes: nodes,
@@ -85,88 +69,70 @@ function simulate(myelin, cfg) {
         };
     }
 
-    // One-time tax for "too much exposed membrane" away from optimal saltatory spacing.
-    var exposedInterior = countExposedInterior(myelin);
-    energy -= exposedInterior * c.exposedDensityTax;
-    steps.push({
-        type: "setup",
-        energyAfter: energy,
-        note: "membrane_leak_tax"
-    });
+    var V = c.startVmV;
+    var energy = c.startEnergy;
+    var minV = V;
 
-    for (var ni = 0; ni < nodes.length - 1; ni++) {
-        var a = nodes[ni];
-        var b = nodes[ni + 1];
-        var dist = b - a;
-        var interior = Math.max(0, dist - 1);
-        var myel = countMyelinBetween(myelin, a, b);
-        var myelFrac = interior > 0 ? myel / interior : 1.0;
-        var exposedBetween = interior - myel;
+    for (var i = 0; i < n; i++) {
+        var kind = segmentKind(myelin, i, n);
+        var vBefore = V;
+        var nodeFlash = false;
+        var regen = false;
 
-        if (dist > c.maxJump) {
-            failReason = "jump_too_far";
-            // Visual-only partial hop so playback still shows an attempted saltation.
-            var partialTo = Math.min(n - 1, a + c.maxJump);
-            var myelPartial = countMyelinBetween(myelin, a, partialTo);
-            var interiorPartial = Math.max(0, partialTo - a - 1);
-            var myelFracPartial = interiorPartial > 0 ? myelPartial / interiorPartial : 1.0;
-            steps.push({
-                type: "jump",
-                from: a,
-                to: partialTo,
-                dist: partialTo - a,
-                myelinatedBetween: myelPartial,
-                myelinatedFraction: myelFracPartial,
-                cost: 0,
-                energyAfter: energy,
-                doomed: true
-            });
-            steps.push({
-                type: "fail",
-                from: a,
-                to: b,
-                dist: dist,
-                energyAfter: energy,
-                reason: failReason
-            });
+        if (kind === "MYELIN") {
+            V -= c.decayMyelinMv;
+        } else if (kind === "NODE") {
+            if (i === 0) {
+                V = c.regenVmV;
+                regen = true;
+            } else if (i === n - 1) {
+                V = c.regenVmV;
+                regen = true;
+                nodeFlash = true;
+            } else {
+                energy -= c.nodeAtpCost;
+                V = c.regenVmV;
+                regen = true;
+                nodeFlash = true;
+            }
+        } else {
+            V -= c.decayLeakyMv;
+        }
+
+        if (V < minV)
+            minV = V;
+
+        steps.push({
+            type: "segment",
+            index: i,
+            kind: kind,
+            vBefore: vBefore,
+            vAfter: V,
+            energyAfter: energy,
+            nodeFlash: nodeFlash,
+            regen: regen
+        });
+
+        if (V < c.failVmV) {
+            failReason = "under_voltage";
             return {
                 ok: false,
                 energy: energy,
+                voltage: V,
+                minVoltage: minV,
                 steps: steps,
                 failReason: failReason,
                 nodes: nodes,
                 config: c
             };
         }
-
-        var cost = dist * c.jumpCostBase;
-        cost *= 1.0 - c.myelinEfficiency * myelFrac;
-        cost += exposedBetween * c.exposedGapPenalty * 0.25;
-        energy -= cost;
-
-        steps.push({
-            type: "jump",
-            from: a,
-            to: b,
-            dist: dist,
-            myelinatedBetween: myel,
-            myelinatedFraction: myelFrac,
-            cost: cost,
-            energyAfter: energy
-        });
-
-        if (energy <= 0) {
+        if (energy <= 0 && i < n - 1) {
             failReason = "out_of_energy";
-            steps.push({
-                type: "fail",
-                from: a,
-                to: b,
-                energyAfter: energy,
-                reason: failReason
-            });
             return {
                 ok: false,
                 energy: energy,
+                voltage: V,
+                minVoltage: minV,
                 steps: steps,
                 failReason: failReason,
                 nodes: nodes,
@@ -175,39 +141,50 @@ function simulate(myelin, cfg) {
         }
     }
 
-    var win = energy > 0 && nodes[nodes.length - 1] === n - 1;
+    var win = V > c.failVmV && energy > 0;
     return {
         ok: win,
         energy: energy,
+        voltage: V,
+        minVoltage: minV,
         steps: steps,
-        failReason: win ? "" : "no_energy_at_end",
+        failReason: win ? "" : (energy <= 0 ? "out_of_energy" : "under_voltage"),
         nodes: nodes,
         config: c
     };
 }
 
-// Inline playback: animation legs derived from simulate() jump steps (0..1 along axon).
+// Playback legs: pulse sweeps each segment; carries vFrom/vTo for glow interpolation.
 function buildPlaybackTimeline(steps, n) {
     var out = [];
     if (!steps || n < 2)
         return out;
-    for (var i = 0; i < steps.length; i++) {
-        var s = steps[i];
-        if (s.type !== "jump")
+    for (var j = 0; j < steps.length; j++) {
+        var s = steps[j];
+        if (s.type !== "segment")
             continue;
-        var toFrac = (n <= 1) ? 0 : s.to / (n - 1);
-        var fromF = (n <= 1) ? 0 : s.from / (n - 1);
-        var dist = s.dist || 1;
-        var myel = s.myelinatedFraction != null ? s.myelinatedFraction : 0.5;
-        var cost = s.cost != null ? s.cost : 1;
-        var durationMs = 320 + dist * 95 + cost * 26 - myel * 220;
-        if (s.doomed)
-            durationMs *= 1.55;
-        durationMs = Math.max(220, Math.min(2000, durationMs));
+        var i = s.index;
+        var fromF = (i + 0.1) / (n - 1);
+        var toF = (i + 0.92) / (n - 1);
+        if (i === n - 1)
+            toF = 1.0;
+        var dur = 185;
+        if (s.kind === "NODE" && s.nodeFlash)
+            dur = 360;
+        else if (s.kind === "NODE")
+            dur = 275;
+        else if (s.kind === "LEAKY")
+            dur = 235;
         out.push({
             fromFrac: fromF,
-            toFrac: toFrac,
-            durationMs: durationMs
+            toFrac: toF,
+            durationMs: dur,
+            vFrom: s.vBefore,
+            vTo: s.vAfter,
+            energyEnd: s.energyAfter,
+            nodeFlash: s.nodeFlash,
+            segIndex: i,
+            kind: s.kind
         });
     }
     return out;

@@ -1,5 +1,5 @@
-// Axon Signals — theme "Signal". Single-view puzzle + suggestive biology (no separate 3D scene).
-// Clayground / Web Dojo: entry is this file; sibling imports js/signalSim.js and optional Playback helpers.
+// Axon Signals — simplified Vm + ATP model; Ranvier pumps only; single view.
+// Web Dojo: entry file; sibling js/signalSim.js.
 
 import QtQuick 2.15
 import QtQuick.Controls 2.15
@@ -10,20 +10,34 @@ ApplicationWindow {
     id: win
     visible: true
     width: 960
-    height: 640
+    height: 680
     title: "Axon Signals — LD Prototype"
     color: "#070910"
 
     property int segmentCount: 26
-    property var myelin: []
-    property var lastSim: ({ ok: false, energy: 0, failReason: "", steps: [], nodes: [] })
-    property string statusLine: "Click segments to toggle myelin ↔ exposed node stretches."
+    property int cellOuterWidth: 28
+    property int axonSpacing: 4
+    readonly property int axonTrackWidth: segmentCount * cellOuterWidth + (segmentCount - 1) * axonSpacing + 24
 
-    // --- Inline signal playback (same view) ---
+    property var myelin: []
+    property var lastSim: ({
+        ok: false,
+        energy: 0,
+        voltage: -55,
+        minVoltage: -55,
+        failReason: "",
+        steps: [],
+        nodes: []
+    })
+    property string statusLine: "Toggle myelin so Ranvier gaps sit between sheaths — pumps only appear there."
+
     property bool playbackActive: false
-    property real signalAlong: 0 // 0..1 along axon for pulse + local VFX
+    property real signalAlong: 0
     property real ionClock: 0
     property real playbackFailBlend: 0
+    property real displayVoltage: -55
+    property int nodeSpikeSeg: -1
+    property real nodeSpikeBoost: 0
 
     function defaultMyelinPattern() {
         var arr = [];
@@ -41,6 +55,9 @@ ApplicationWindow {
         playbackActive = false;
         signalAlong = 0;
         playbackFailBlend = 0;
+        nodeSpikeSeg = -1;
+        nodeSpikeBoost = 0;
+        displayVoltage = -55;
     }
 
     function startSignalPlayback() {
@@ -48,11 +65,12 @@ ApplicationWindow {
         playTimer.legIndex = 0;
         playTimer.legU = 0;
         if (playTimer.timeline.length === 0) {
-            statusLine = lastSim.ok ? "Signal path ready (no jumps to animate)." : "No propagation legs to play.";
+            statusLine = "Nothing to animate.";
             return;
         }
         playbackActive = true;
         playbackFailBlend = 0;
+        displayVoltage = playTimer.timeline[0].vFrom;
         playTimer.running = true;
     }
 
@@ -60,7 +78,7 @@ ApplicationWindow {
         stopPlayback();
         myelin = defaultMyelinPattern();
         refreshPreview();
-        statusLine = "Foot to brain: toggle myelin — exposed stretches read as nodes of Ranvier.";
+        statusLine = "Foot → Brain: myelin decays Vm slowly; Ranvier nodes spend ATP and reset Vm to −55 mV.";
     }
 
     function refreshPreview() {
@@ -75,25 +93,29 @@ ApplicationWindow {
     }
 
     function describeFail(code) {
-        if (code === "jump_too_far")
-            return "saltation gap exceeded the node's reach.";
+        if (code === "under_voltage")
+            return "membrane potential fell past −70 mV.";
         if (code === "out_of_energy")
-            return "the axon ran out of electrochemical budget.";
+            return "ATP ran out before the signal finished.";
         if (code === "no_path")
-            return "no valid node layout.";
-        return "signal dissipated.";
+            return "axon layout invalid.";
+        return "propagation failed.";
     }
 
     function smoothstep(u) {
         return u * u * (3 - 2 * u);
     }
 
-    // Ambient motion for pumps / ions (always on, faster during propagation).
+    // Voltage → 0..1 glow headroom above failure threshold (−70 mV), capped toward −50 mV.
+    function voltageGlowNorm(vm) {
+        return Math.max(0, Math.min(1, (vm - (-70)) / ((-50) - (-70))));
+    }
+
     Timer {
         interval: 48
         repeat: true
         running: true
-        onTriggered: win.ionClock += win.playbackActive ? 0.14 : 0.045
+        onTriggered: win.ionClock += win.playbackActive ? 0.14 : 0.04
     }
 
     Timer {
@@ -113,26 +135,38 @@ ApplicationWindow {
             var leg = timeline[legIndex];
             var stepScale = (!win.lastSim.ok) ? (1.0 - 0.35 * win.playbackFailBlend) : 1.0;
             legU += (interval / leg.durationMs) * stepScale;
+            var sm = win.smoothstep(Math.min(1, legU));
+            win.signalAlong = leg.fromFrac + (leg.toFrac - leg.fromFrac) * sm;
+            win.displayVoltage = leg.vFrom + (leg.vTo - leg.vFrom) * sm;
+
+            if (leg.nodeFlash)
+                win.nodeSpikeBoost = Math.max(0, 1 - Math.abs(legU - 0.5) * 2.35);
+            else
+                win.nodeSpikeBoost = 0;
+            win.nodeSpikeSeg = leg.nodeFlash ? leg.segIndex : -1;
+
             if (legU >= 1.0) {
                 legU = 0;
                 legIndex++;
+                win.nodeSpikeBoost = 0;
+                win.nodeSpikeSeg = -1;
                 if (legIndex >= timeline.length) {
                     win.signalAlong = 1.0;
+                    win.displayVoltage = win.lastSim.voltage;
                     win.playbackActive = false;
                     running = false;
                     if (win.lastSim.ok)
-                        win.statusLine = "Success — volley reached the soma with energy to spare.";
+                        win.statusLine = "Success — Vm and ATP both healthy at the soma.";
                     else
                         win.statusLine = "Failed — " + win.describeFail(win.lastSim.failReason);
                     win.refreshPreview();
                     return;
                 }
                 leg = timeline[legIndex];
+                win.displayVoltage = leg.vFrom;
             }
-            var sm = win.smoothstep(legU);
-            win.signalAlong = leg.fromFrac + (leg.toFrac - leg.fromFrac) * sm;
             if (!win.lastSim.ok && legIndex >= timeline.length - 1)
-                win.playbackFailBlend = Math.min(1, win.playbackFailBlend + 0.035);
+                win.playbackFailBlend = Math.min(1, win.playbackFailBlend + 0.03);
         }
     }
 
@@ -145,31 +179,43 @@ ApplicationWindow {
     }
 
     ColumnLayout {
+        id: mainCol
         anchors.fill: parent
-        anchors.margins: 20
-        spacing: 12
+        anchors.margins: 18
+        spacing: 10
 
         RowLayout {
             Layout.fillWidth: true
-            spacing: 16
+            spacing: 14
             Label {
                 text: "Axon Signals"
                 color: "#e8f6ff"
-                font.pixelSize: 26
+                font.pixelSize: 24
                 font.bold: true
             }
             Item { Layout.fillWidth: true }
             Label {
-                text: "Energy: <b>" + Math.round(lastSim.energy * 10) / 10 + "</b>"
+                text: "ATP: <b>" + Math.round(lastSim.energy * 10) / 10 + "</b>"
                 color: "#7cf5c6"
                 textFormat: Text.RichText
-                font.pixelSize: 14
+                font.pixelSize: 13
             }
             Label {
-                text: lastSim.ok ? "<span style='color:#9af'>Ready</span>"
-                                 : "<span style='color:#f88'>Risk</span>"
+                text: "Vm (end): <b>" + Math.round(lastSim.voltage * 10) / 10 + " mV</b>"
+                color: "#9fd7ff"
                 textFormat: Text.RichText
-                font.pixelSize: 14
+                font.pixelSize: 13
+            }
+            Label {
+                text: "Vm min: <b>" + Math.round(lastSim.minVoltage * 10) / 10 + " mV</b>"
+                color: "#c8b8ff"
+                textFormat: Text.RichText
+                font.pixelSize: 12
+            }
+            Label {
+                text: lastSim.ok ? "<span style='color:#9af'>OK</span>" : "<span style='color:#f88'>Risk</span>"
+                textFormat: Text.RichText
+                font.pixelSize: 13
             }
         }
 
@@ -178,10 +224,9 @@ ApplicationWindow {
             wrapMode: Text.WordWrap
             text: statusLine
             color: "#b8c7dd"
-            font.pixelSize: 13
+            font.pixelSize: 12
         }
 
-        // --- Membrane strip: one readable row with embedded “biology” cues ---
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
@@ -193,252 +238,263 @@ ApplicationWindow {
                 Layout.alignment: Qt.AlignVCenter
             }
 
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.minimumHeight: 148
-                radius: 12
-                color: "#0c101c"
-                border.color: "#223047"
-                border.width: 1
+            Item {
+                id: axonBand
+                Layout.alignment: Qt.AlignHCenter
+                Layout.preferredWidth: Math.min(axonTrackWidth, Math.max(200, mainCol.width - 120))
+                Layout.minimumWidth: 160
+                height: 156
+                clip: false
 
-                Flickable {
-                    id: axonFlick
+                Rectangle {
                     anchors.fill: parent
-                    anchors.margins: 8
-                    contentWidth: axonRow.width
-                    contentHeight: height
-                    clip: true
-                    Row {
-                        id: axonRow
-                        spacing: 5
-                        height: 132
+                    radius: 12
+                    color: "#0c101c"
+                    border.color: "#223047"
+                    border.width: 1
 
-                        Repeater {
-                            model: win.segmentCount
+                    Flickable {
+                        id: axonFlick
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        contentWidth: axonRow.width
+                        contentHeight: height
+                        clip: true
+                        Row {
+                            id: axonRow
+                            spacing: axonSpacing
+                            height: 132
+                            x: Math.max(0, (axonFlick.width - width) / 2)
 
-                            Item {
-                                id: cell
-                                width: 30
-                                height: axonRow.height
+                            Repeater {
+                                model: win.segmentCount
 
-                                readonly property bool isEnd: index === 0 || index === win.segmentCount - 1
-                                readonly property bool isMyelin: !isEnd && win.myelin[index]
-                                readonly property bool isNode: !isEnd && !isMyelin
-                                readonly property real sigDist: Math.abs(
-                                    index - win.signalAlong * (win.segmentCount - 1))
-                                readonly property bool nearPulse: win.playbackActive && sigDist < 1.15
-                                readonly property real pulseGlow: {
-                                    if (!win.playbackActive)
-                                        return 0;
-                                    if (sigDist < 0.5)
-                                        return 0.65 * (1 - sigDist / 0.5);
-                                    return 0;
-                                }
-
-                                // Membrane wall (suggestive pseudo-depth)
-                                Rectangle {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: isMyelin ? 26 : 24
-                                    height: 102
-                                    radius: 10
-                                    border.width: isNode ? 2 : 1
-                                    border.color: isNode ? "#ff8a3d" : "#1a3044"
-                                    gradient: Gradient {
-                                        GradientStop {
-                                            position: 0
-                                            color: isEnd ? "#353b4d" : (isMyelin ? "#2a8f52" : "#6d3a22")
-                                        }
-                                        GradientStop {
-                                            position: 0.5
-                                            color: isEnd ? "#2a3040" : (isMyelin ? "#1f6b3a" : "#3d2215")
-                                        }
-                                        GradientStop {
-                                            position: 1
-                                            color: isEnd ? "#1a1e28" : (isMyelin ? "#14321f" : "#2a150e")
-                                        }
-                                    }
-                                }
-
-                                // Myelin “wrap” lobes (thicker insulation read)
-                                Rectangle {
-                                    visible: isMyelin
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 8
-                                    height: 92
-                                    radius: 4
-                                    color: "#1a5c32"
-                                    opacity: 0.55
-                                    anchors.horizontalCenterOffset: -11
-                                }
-                                Rectangle {
-                                    visible: isMyelin
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 8
-                                    height: 92
-                                    radius: 4
-                                    color: "#1a5c32"
-                                    opacity: 0.55
-                                    anchors.horizontalCenterOffset: 11
-                                }
-
-                                // Node of Ranvier: exposed channel striations
-                                Column {
-                                    visible: isNode
-                                    anchors.centerIn: parent
-                                    spacing: 6
-                                    Repeater {
-                                        model: 4
-                                        Rectangle {
-                                            width: 10
-                                            height: 2
-                                            radius: 1
-                                            color: "#ff9a5a"
-                                            opacity: 0.35 + index * 0.12
-                                        }
-                                    }
-                                }
-
-                                // Axon lumen (core the pulse rides)
-                                Rectangle {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 6
-                                    height: 76
-                                    radius: 3
-                                    color: "#2ed3ff"
-                                    opacity: isEnd ? 0.35 : 0.75
-                                }
-
-                                // Na/K pumps (simplified enzyme blobs on membrane)
                                 Item {
-                                    visible: !isEnd
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.top: parent.top
-                                    anchors.topMargin: 6
-                                    width: 26
-                                    height: 26
+                                    id: cell
+                                    width: win.cellOuterWidth
+                                    height: axonRow.height
+
+                                    readonly property bool isEnd: index === 0 || index === win.segmentCount - 1
+                                    readonly property string segKind: SignalSim.segmentKind(win.myelin, index, win.segmentCount)
+                                    readonly property bool isMyelin: segKind === "MYELIN"
+                                    readonly property bool isNode: segKind === "NODE"
+                                    readonly property bool isLeak: segKind === "LEAKY"
+
+                                    readonly property real sigDist: Math.abs(
+                                        index - win.signalAlong * (win.segmentCount - 1))
+                                    readonly property bool nearPulse: win.playbackActive && sigDist < 0.95
+
+                                    readonly property real vNorm: win.playbackActive
+                                            ? win.voltageGlowNorm(win.displayVoltage)
+                                            : win.voltageGlowNorm(win.lastSim.voltage)
+                                    readonly property real pulseBase: {
+                                        if (!win.playbackActive)
+                                            return 0;
+                                        if (sigDist < 0.48)
+                                            return 0.72 * (1 - sigDist / 0.48);
+                                        return 0;
+                                    }
+                                    readonly property real pulseGlow: pulseBase * (0.35 + 0.65 * vNorm) * (1 - 0.55 * win.playbackFailBlend)
+                                    readonly property real spikeBoost: (win.nodeSpikeSeg === index) ? win.nodeSpikeBoost * 0.95 : 0
+
                                     Rectangle {
-                                        id: pumpL
-                                        x: 2
-                                        y: 4
-                                        width: 10
-                                        height: 16
-                                        radius: 3
-                                        color: nearPulse ? "#7ea8ff" : "#4d6aa8"
-                                        border.color: "#a8c8ff"
-                                        border.width: 1
-                                        transform: Rotation {
-                                            origin.x: 5
-                                            origin.y: 8
-                                            axis: Qt.vector3d(0, 0, 1)
-                                            angle: nearPulse ? 12 * Math.sin(win.ionClock * 2.2)
-                                                             : 4 * Math.sin(win.ionClock * 0.9)
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: isMyelin ? 24 : 22
+                                        height: 100
+                                        radius: 9
+                                        border.width: isNode ? 2 : (isLeak ? 1 : 1)
+                                        border.color: isNode ? "#ff9a4d" : (isLeak ? "#7a4a2a" : "#1e3a28")
+                                        gradient: Gradient {
+                                            GradientStop {
+                                                position: 0
+                                                color: isMyelin ? "#2d9a58" : (isNode ? "#7a4528" : "#5a3020")
+                                            }
+                                            GradientStop {
+                                                position: 0.5
+                                                color: isMyelin ? "#1f6b3a" : (isNode ? "#4a2818" : "#3d2215")
+                                            }
+                                            GradientStop {
+                                                position: 1
+                                                color: isMyelin ? "#14321f" : (isNode ? "#2a150e" : "#241208")
+                                            }
                                         }
                                     }
+
                                     Rectangle {
-                                        id: pumpR
-                                        x: 14
-                                        y: 4
-                                        width: 10
-                                        height: 16
+                                        visible: isMyelin
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 7
+                                        height: 90
                                         radius: 3
-                                        color: nearPulse ? "#9ab8ff" : "#556db0"
-                                        border.color: "#c8d8ff"
-                                        border.width: 1
-                                        transform: Rotation {
-                                            origin.x: 5
-                                            origin.y: 8
-                                            axis: Qt.vector3d(0, 0, 1)
-                                            angle: nearPulse ? -10 * Math.sin(win.ionClock * 2.0 + 0.4)
-                                                             : -3 * Math.sin(win.ionClock * 0.85)
+                                        color: "#1a5c32"
+                                        opacity: 0.5
+                                        anchors.horizontalCenterOffset: -10
+                                    }
+                                    Rectangle {
+                                        visible: isMyelin
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 7
+                                        height: 90
+                                        radius: 3
+                                        color: "#1a5c32"
+                                        opacity: 0.5
+                                        anchors.horizontalCenterOffset: 10
+                                    }
+
+                                    Column {
+                                        visible: isNode
+                                        anchors.centerIn: parent
+                                        spacing: 5
+                                        Repeater {
+                                            model: 4
+                                            Rectangle {
+                                                width: 9
+                                                height: 2
+                                                radius: 1
+                                                color: "#ffb070"
+                                                opacity: 0.4 + index * 0.14
+                                            }
                                         }
                                     }
+
+                                    Rectangle {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 5
+                                        height: 74
+                                        radius: 2
+                                        color: "#2ed3ff"
+                                        opacity: isMyelin ? 0.25 : 0.72
+                                    }
+
+                                    Item {
+                                        visible: isNode
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.top: parent.top
+                                        anchors.topMargin: 5
+                                        width: 24
+                                        height: 24
+                                        Rectangle {
+                                            x: 1
+                                            y: 3
+                                            width: 9
+                                            height: 15
+                                            radius: 3
+                                            color: (nearPulse || spikeBoost > 0.2) ? "#8eb6ff" : "#4d6aa8"
+                                            border.color: "#bcd6ff"
+                                            border.width: 1
+                                            transform: Rotation {
+                                                origin.x: 4.5
+                                                origin.y: 7.5
+                                                axis: Qt.vector3d(0, 0, 1)
+                                                angle: (nearPulse || spikeBoost > 0.15)
+                                                        ? 14 * Math.sin(win.ionClock * 2.4)
+                                                        : 3 * Math.sin(win.ionClock * 0.85)
+                                            }
+                                        }
+                                        Rectangle {
+                                            x: 13
+                                            y: 3
+                                            width: 9
+                                            height: 15
+                                            radius: 3
+                                            color: (nearPulse || spikeBoost > 0.2) ? "#a8c4ff" : "#556db0"
+                                            border.color: "#dce8ff"
+                                            border.width: 1
+                                            transform: Rotation {
+                                                origin.x: 4.5
+                                                origin.y: 7.5
+                                                axis: Qt.vector3d(0, 0, 1)
+                                                angle: (nearPulse || spikeBoost > 0.15)
+                                                        ? -12 * Math.sin(win.ionClock * 2.1 + 0.3)
+                                                        : -2.5 * Math.sin(win.ionClock * 0.8)
+                                            }
+                                        }
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 5
+                                            height: 5
+                                            radius: 2.5
+                                            color: "#ffff99"
+                                            opacity: spikeBoost > 0.1 ? 0.5 + 0.45 * spikeBoost : (nearPulse ? 0.35 : 0.1)
+                                        }
+                                    }
+
+                                    Item {
+                                        visible: isNode
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.bottom: parent.bottom
+                                        anchors.bottomMargin: 8
+                                        width: 22
+                                        height: 20
+                                        Rectangle {
+                                            width: 4
+                                            height: 4
+                                            radius: 2
+                                            color: "#ffd54a"
+                                            x: 2 + 2 * Math.sin(win.ionClock + index)
+                                            y: 4 + (nearPulse ? 5 * Math.sin(win.ionClock * 4) : 2 * Math.sin(win.ionClock))
+                                        }
+                                        Rectangle {
+                                            width: 4
+                                            height: 4
+                                            radius: 2
+                                            color: "#ffd54a"
+                                            x: 11
+                                            y: 10 + (nearPulse ? 4 * Math.cos(win.ionClock * 3.5) : 1.5 * Math.cos(win.ionClock))
+                                        }
+                                        Rectangle {
+                                            width: 4
+                                            height: 4
+                                            radius: 2
+                                            color: "#c77dff"
+                                            x: 7 + 2 * Math.cos(win.ionClock * 0.9)
+                                            y: 2 + (nearPulse ? 4 * Math.sin(win.ionClock * 3.2) : 1 * Math.sin(win.ionClock))
+                                        }
+                                        Rectangle {
+                                            width: 4
+                                            height: 4
+                                            radius: 2
+                                            color: "#c77dff"
+                                            x: 16
+                                            y: 12 + (nearPulse ? 3 * Math.cos(win.ionClock * 4) : 1 * Math.cos(win.ionClock))
+                                        }
+                                    }
+
                                     Rectangle {
                                         anchors.centerIn: parent
-                                        width: 6
-                                        height: 6
-                                        radius: 3
-                                        color: "#ffffaa"
-                                        opacity: nearPulse ? 0.55 + 0.35 * Math.sin(win.ionClock * 5) : 0.12
+                                        width: 20
+                                        height: 84
+                                        radius: 8
+                                        color: "transparent"
+                                        border.width: 2
+                                        border.color: Qt.rgba(0.35, 0.95, 1.0,
+                                            0.12 + 0.78 * pulseGlow + 0.55 * spikeBoost)
+                                        opacity: 0.2 + pulseGlow * 0.75 + spikeBoost * 0.5
                                     }
-                                }
 
-                                // Ion spheres (Na+ gold, K+ violet) — shuffle when pulse is close (suggestive exchange)
-                                Item {
-                                    visible: !isEnd
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.bottom: parent.bottom
-                                    anchors.bottomMargin: 10
-                                    width: 26
-                                    height: 22
-                                    Rectangle {
-                                        width: 5
-                                        height: 5
-                                        radius: 2.5
-                                        color: "#ffd54a"
-                                        x: 2 + 2 * Math.sin(win.ionClock + index)
-                                        y: 4 + (nearPulse ? 5 * Math.sin(win.ionClock * 4) : 2 * Math.sin(win.ionClock))
+                                    Label {
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.bottom: parent.bottom
+                                        anchors.bottomMargin: 1
+                                        text: index === 0 ? "F" : (index === win.segmentCount - 1 ? "B" : "")
+                                        color: "#9fe8ff"
+                                        font.pixelSize: 8
                                     }
-                                    Rectangle {
-                                        width: 5
-                                        height: 5
-                                        radius: 2.5
-                                        color: "#ffd54a"
-                                        x: 12 + 1.5 * Math.sin(win.ionClock * 1.1 + 1)
-                                        y: 10 + (nearPulse ? 4 * Math.cos(win.ionClock * 3.5) : 1.5 * Math.cos(win.ionClock))
-                                    }
-                                    Rectangle {
-                                        width: 5
-                                        height: 5
-                                        radius: 2.5
-                                        color: "#c77dff"
-                                        x: 8 + 2 * Math.cos(win.ionClock * 0.8)
-                                        y: 2 + (nearPulse ? 4 * Math.sin(win.ionClock * 3.2 + 0.7) : 1 * Math.sin(win.ionClock))
-                                    }
-                                    Rectangle {
-                                        width: 5
-                                        height: 5
-                                        radius: 2.5
-                                        color: "#c77dff"
-                                        x: 18 + 1.2 * Math.sin(win.ionClock * 1.3 + 2)
-                                        y: 12 + (nearPulse ? 3 * Math.cos(win.ionClock * 4.1) : 1 * Math.cos(win.ionClock))
-                                    }
-                                }
 
-                                // Traveling pulse read (easy to track)
-                                Rectangle {
-                                    anchors.centerIn: parent
-                                    width: 22
-                                    height: 86
-                                    radius: 9
-                                    color: "transparent"
-                                    border.width: 2
-                                    border.color: Qt.rgba(0.4, 0.95, 1.0, 0.15 + 0.85 * pulseGlow * (1 - 0.55 * win.playbackFailBlend))
-                                    opacity: 0.25 + pulseGlow
-                                }
-
-                                Label {
-                                    anchors.horizontalCenter: parent.horizontalCenter
-                                    anchors.bottom: parent.bottom
-                                    anchors.bottomMargin: 2
-                                    text: index === 0 ? "F" : (index === win.segmentCount - 1 ? "B" : "")
-                                    color: "#9fe8ff"
-                                    font.pixelSize: 9
-                                }
-
-                                MouseArea {
-                                    anchors.fill: parent
-                                    enabled: !isEnd && !win.playbackActive
-                                    hoverEnabled: true
-                                    cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-                                    acceptedButtons: Qt.LeftButton
-                                    onClicked: {
-                                        var copy = win.myelin.slice();
-                                        copy[index] = !copy[index];
-                                        win.myelin = copy;
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        enabled: !isEnd && !win.playbackActive
+                                        hoverEnabled: true
+                                        cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                        onClicked: {
+                                            var copy = win.myelin.slice();
+                                            copy[index] = !copy[index];
+                                            win.myelin = copy;
+                                        }
                                     }
                                 }
                             }
@@ -466,8 +522,8 @@ ApplicationWindow {
                     win.stopPlayback();
                     win.lastSim = SignalSim.simulate(win.myelin, null);
                     win.statusLine = win.lastSim.ok
-                            ? "Watch the pulse — pumps and ions flare near the wave (simplified biology)."
-                            : "Watch for stalls: spacing and myelin still decide the outcome.";
+                            ? "Send: Vm holds above −70 mV and ATP > 0 at the brain — watch the pulse."
+                            : "Risk: long myelin runs leak Vm; every real node spends ATP to reset Vm to −55 mV.";
                     win.startSignalPlayback();
                 }
             }
@@ -476,7 +532,7 @@ ApplicationWindow {
                 onClicked: win.resetLevel()
             }
             Label {
-                text: "Click segments to toggle myelin vs node (Foot/Brain fixed). Scroll if the strip is clipped."
+                text: "Click interior cells to toggle myelin. Pumps / ions only at Ranvier gaps (between sheaths) and ends. Track width scales with segment count."
                 color: "#7a8699"
                 font.pixelSize: 11
                 Layout.fillWidth: true
