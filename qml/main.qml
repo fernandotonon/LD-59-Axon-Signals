@@ -310,7 +310,7 @@ ApplicationWindow {
                                     readonly property bool isNode: segKind === "NODE"
                                     readonly property bool isLeak: segKind === "LEAKY"
                                     // True for foot, brain, and every internode Ranvier gap (myelin on both sides).
-                                    readonly property bool showEnzymes: SignalSim.isRanvierNode(win.myelin, index, win.segmentCount)
+                                    readonly property bool showEnzymes: SignalSim.shouldShowPumps(win.myelin, index, win.segmentCount)
                                     readonly property bool isRanvierGap: !isEnd && !win.myelin[index]
                                             && win.myelin[index - 1] && win.myelin[index + 1]
 
