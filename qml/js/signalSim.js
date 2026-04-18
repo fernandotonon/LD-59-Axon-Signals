@@ -3,8 +3,8 @@
 // Voltage convention (algebraic):
 //   * More NEGATIVE Vm = stronger / "deeper" signal (used for brighter pulse read).
 //   * Vm moving toward 0 = weaker (risky); Vm >= 0 = collapsed failure.
-//   * Ranvier NODE (any non-myelin segment) pulls Vm toward 0 (nodePenalty).
-//   * MYELIN steps re-deepen Vm (add negative delta: myelinBoost).
+//   * Ranvier NODE (any non-myelin segment) deepens Vm (more negative: ranvierDeepen).
+//   * MYELIN steps relax Vm toward 0 mV (less negative: myelinRelax).
 //
 // All tuning lives in `defaultConfig` - tweak there only.
 .pragma library
@@ -12,10 +12,10 @@
 var defaultConfig = {
     // --- Voltage tuning (mV, algebraic) ---
     startVoltage: -70,
-    // Ranvier NODE: move Vm toward zero (less negative), e.g. -70 + 12 = -58.
-    nodePenalty: 12,
-    // MYELIN: move Vm more negative again, e.g. -58 + (-6) = -64.
-    myelinBoost: -6,
+    // Ranvier NODE: deepen Vm (more negative), e.g. -70 + (-6) = -76.
+    ranvierDeepen: -6,
+    // MYELIN: relax toward 0 (less negative), e.g. -76 + 12 = -64.
+    myelinRelax: 12,
 
     failIfVoltageGte: 0,
     brainActivationThreshold: -55,
@@ -83,9 +83,9 @@ function simulate(myelin, cfg) {
         var vBefore = V;
 
         if (kind === "MYELIN")
-            V += c.myelinBoost;
+            V += c.myelinRelax;
         else
-            V += c.nodePenalty;
+            V += c.ranvierDeepen;
 
         if (V > peakV)
             peakV = V;

@@ -1,4 +1,4 @@
-// Axon Signals - negative Vm puzzle: nodes pull toward 0 mV, myelin re-deepens; collapse if Vm >= 0.
+// Axon Signals - negative Vm puzzle: Ranvier deepens Vm; myelin relaxes toward 0 mV; collapse if Vm >= 0.
 // Web Dojo: entry file; sibling js/signalSim.js.
 
 import QtQuick 2.15
@@ -33,7 +33,7 @@ ApplicationWindow {
         nodes: [],
         config: { startVoltage: -70, brainActivationThreshold: -55, failIfVoltageGte: 0 }
     })
-    property string statusLine: "Nodes (gaps + ends) pull Vm toward 0; myelin pushes it negative again. Stay below 0 mV; reach the brain at or below -55 mV."
+    property string statusLine: "Ranvier (gaps + ends) deepens Vm; myelin raises it toward 0 mV. Stay below 0 mV; reach the brain at or below -55 mV."
 
     property bool playbackActive: false
     property real signalAlong: 0
@@ -90,7 +90,7 @@ ApplicationWindow {
         stopPlayback();
         myelin = defaultMyelinPattern();
         refreshPreview();
-        statusLine = "Foot -> Brain: myelin re-strengthens Vm (more negative); each Ranvier node relaxes it toward 0. Never reach 0 mV.";
+        statusLine = "Foot -> Brain: Ranvier nodes deepen Vm (more negative); myelin raises it toward 0. Never reach 0 mV.";
     }
 
     function refreshPreview() {
@@ -622,7 +622,7 @@ ApplicationWindow {
                     win.lastSim = SignalSim.simulate(win.myelin, null);
                     win.statusLine = win.lastSim.ok
                             ? "Send: keep Vm below 0 mV and finish the brain at or below -55 mV."
-                            : "Risk: too many nodes drag Vm toward 0; myelin must pull it negative again before collapse.";
+                            : "Risk: too much myelin raises Vm toward 0; add Ranvier stretches to deepen it again before collapse.";
                     win.startSignalPlayback();
                 }
             }
