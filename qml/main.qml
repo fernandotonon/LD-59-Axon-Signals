@@ -87,52 +87,6 @@ ApplicationWindow {
         lastSim = SignalSim.simulate(myelin, null);
     }
 
-    // Pump / gap-striping visibility must use functions on this object (not SignalSim pragmalib):
-    // QML does not track property dependencies for reads inside imported .pragma library JS.
-    function cellShowsPumps(i) {
-        var m = myelin;
-        var n = segmentCount;
-        if (i < 0 || i >= n || m[i])
-            return false;
-        if (i === 0 || i === n - 1)
-            return true;
-        var a, b, L = false, R = false;
-        for (a = i - 1; a >= 0; a--) {
-            if (m[a]) {
-                L = true;
-                break;
-            }
-        }
-        for (b = i + 1; b < n; b++) {
-            if (m[b]) {
-                R = true;
-                break;
-            }
-        }
-        return L && R;
-    }
-
-    function cellShowsGapStriations(i) {
-        var m = myelin;
-        var n = segmentCount;
-        if (i <= 0 || i >= n - 1 || m[i])
-            return false;
-        var a, b, L = false, R = false;
-        for (a = i - 1; a >= 0; a--) {
-            if (m[a]) {
-                L = true;
-                break;
-            }
-        }
-        for (b = i + 1; b < n; b++) {
-            if (m[b]) {
-                R = true;
-                break;
-            }
-        }
-        return L && R;
-    }
-
     Component.onCompleted: resetLevel()
 
     onMyelinChanged: {
@@ -354,9 +308,8 @@ ApplicationWindow {
                                     readonly property string segKind: SignalSim.segmentKind(win.myelin, index, win.segmentCount)
                                     readonly property bool isMyelin: segKind === "MYELIN"
                                     readonly property bool isNode: segKind === "NODE"
-                                    readonly property bool isLeak: segKind === "LEAKY"
-                                    readonly property bool showEnzymes: win.cellShowsPumps(index)
-                                    readonly property bool isRanvierGap: win.cellShowsGapStriations(index)
+                                    readonly property bool showEnzymes: isNode
+                                    readonly property bool showRanvierStripes: isNode
 
                                     readonly property real sigDist: Math.abs(
                                         index - win.signalAlong * (win.segmentCount - 1))
@@ -387,20 +340,20 @@ ApplicationWindow {
                                         width: isMyelin ? 24 : 22
                                         height: 100
                                         radius: 9
-                                        border.width: isNode ? 2 : (isLeak ? 1 : 1)
-                                        border.color: isNode ? "#ff9a4d" : (isLeak ? "#7a4a2a" : "#1e3a28")
+                                        border.width: isMyelin ? 1 : 2
+                                        border.color: isMyelin ? "#1e3a28" : "#ff9a4d"
                                         gradient: Gradient {
                                             GradientStop {
                                                 position: 0
-                                                color: isMyelin ? "#2d9a58" : (isNode ? "#7a4528" : "#5a3020")
+                                                color: isMyelin ? "#2d9a58" : "#7a4528"
                                             }
                                             GradientStop {
                                                 position: 0.5
-                                                color: isMyelin ? "#1f6b3a" : (isNode ? "#4a2818" : "#3d2215")
+                                                color: isMyelin ? "#1f6b3a" : "#4a2818"
                                             }
                                             GradientStop {
                                                 position: 1
-                                                color: isMyelin ? "#14321f" : (isNode ? "#2a150e" : "#241208")
+                                                color: isMyelin ? "#14321f" : "#2a150e"
                                             }
                                         }
                                     }
@@ -429,7 +382,7 @@ ApplicationWindow {
                                     }
 
                                     Column {
-                                        visible: isRanvierGap
+                                        visible: showRanvierStripes
                                         anchors.centerIn: parent
                                         spacing: 5
                                         Repeater {
@@ -622,7 +575,7 @@ ApplicationWindow {
                 onClicked: win.resetLevel()
             }
             Label {
-                text: "Click interior cells to toggle myelin. Pumps + ions on every Ranvier site (gaps between sheaths, foot, brain). Track width scales with segment count."
+                text: "Click interior cells to toggle myelin. Every Ranvier node (non-myelin) shows stripes, pumps, and ions. Track width scales with segment count."
                 color: "#7a8699"
                 font.pixelSize: 11
                 Layout.fillWidth: true

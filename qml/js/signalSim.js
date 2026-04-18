@@ -3,7 +3,7 @@
 // Voltage convention (algebraic):
 //   * More NEGATIVE Vm = stronger / "deeper" signal (used for brighter pulse read).
 //   * Vm moving toward 0 = weaker (risky); Vm >= 0 = collapsed failure.
-//   * Ranvier NODE steps pull Vm toward 0 (add positive delta: nodePenalty).
+//   * Ranvier NODE (any non-myelin segment) pulls Vm toward 0 (nodePenalty).
 //   * MYELIN steps re-deepen Vm (add negative delta: myelinBoost).
 //
 // All tuning lives in `defaultConfig` - tweak there only.
@@ -16,8 +16,6 @@ var defaultConfig = {
     nodePenalty: 12,
     // MYELIN: move Vm more negative again, e.g. -58 + (-6) = -64.
     myelinBoost: -6,
-    // LEAKY exposed (not a true Ranvier gap): partial pull toward zero (tweakable).
-    leakPenalty: 7,
 
     failIfVoltageGte: 0,
     brainActivationThreshold: -55,
@@ -31,11 +29,7 @@ function segmentKind(myelin, i, n) {
         return "INVALID";
     if (myelin[i])
         return "MYELIN";
-    if (i === 0 || i === n - 1)
-        return "NODE";
-    if (myelin[i - 1] && myelin[i + 1])
-        return "NODE";
-    return "LEAKY";
+    return "NODE";
 }
 
 function isRanvierNode(myelin, i, n) {
@@ -90,10 +84,8 @@ function simulate(myelin, cfg) {
 
         if (kind === "MYELIN")
             V += c.myelinBoost;
-        else if (kind === "NODE")
-            V += c.nodePenalty;
         else
-            V += c.leakPenalty;
+            V += c.nodePenalty;
 
         if (V > peakV)
             peakV = V;
@@ -164,13 +156,11 @@ function buildPlaybackTimeline(steps, n) {
         var toF = (i + 0.92) / (n - 1);
         if (i === n - 1)
             toF = 1.0;
-        var dur = 210;
+        var dur = 280;
         if (s.kind === "MYELIN")
             dur = 240;
         else if (s.kind === "NODE")
             dur = s.nodeFlash ? 320 : 280;
-        else
-            dur = 220;
         out.push({
             fromFrac: fromF,
             toFrac: toF,
