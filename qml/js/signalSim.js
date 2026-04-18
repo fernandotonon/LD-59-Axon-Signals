@@ -1,17 +1,31 @@
-// signalSim.js — simplified membrane potential + ATP (game-readable, not biophysical).
+// signalSim.js — game-style axon voltage (negative mV). Not a biophysical model.
+//
+// Voltage convention (algebraic):
+//   • More NEGATIVE Vm = stronger / “deeper” signal (used for brighter pulse read).
+//   • Vm moving toward 0 = weaker (risky); Vm >= 0 = collapsed failure.
+//   • Ranvier NODE steps pull Vm toward 0 (add positive delta: nodePenalty).
+//   • MYELIN steps re-deepen Vm (add negative delta: myelinBoost).
+//
+// All tuning lives in `defaultConfig` — tweak there only.
 .pragma library
 
 var defaultConfig = {
-    regenVmV: -55,
-    failVmV: -70,
-    startVmV: -55,
-    startEnergy: 100,
-    decayMyelinMv: 3.0,
-    decayLeakyMv: 9.0,
-    nodeAtpCost: 14
+    // --- Voltage tuning (mV, algebraic) ---
+    startVoltage: -70,
+    // Ranvier NODE: move Vm toward zero (less negative), e.g. −70 + 12 = −58.
+    nodePenalty: 12,
+    // MYELIN: move Vm more negative again, e.g. −58 + (−6) = −64.
+    myelinBoost: -6,
+    // LEAKY exposed (not a true Ranvier gap): partial pull toward zero (tweakable).
+    leakPenalty: 7,
+
+    failIfVoltageGte: 0,
+    brainActivationThreshold: -55,
+
+    // Legacy field kept for QML bindings that still read `energyAfter` on steps (unused in rules).
+    startEnergy: 100
 };
 
-// MYELIN = internode sheath; NODE = foot, brain, or true gap between myelin; LEAKY = exposed but not a Ranvier gap.
 function segmentKind(myelin, i, n) {
     if (i < 0 || i >= n)
         return "INVALID";
@@ -28,7 +42,6 @@ function isRanvierNode(myelin, i, n) {
     return segmentKind(myelin, i, n) === "NODE";
 }
 
-// Kept for tooling / QML; lists indices where pumps may appear (all NODE kinds).
 function buildRanvierNodeIndices(myelin) {
     var n = myelin.length;
     var out = [];
@@ -39,7 +52,8 @@ function buildRanvierNodeIndices(myelin) {
     return out;
 }
 
-// Returns { ok, energy, voltage, minVoltage, steps, failReason, nodes, config }.
+// Returns { ok, voltage, peakVoltage, steps, failReason, nodes, config }.
+// peakVoltage = algebraically maximum Vm (closest to 0) seen along the trace.
 function simulate(myelin, cfg) {
     var c = {};
     for (var key in defaultConfig)
@@ -53,15 +67,15 @@ function simulate(myelin, cfg) {
 
     var n = myelin.length;
     var steps = [];
-    var failReason = "";
     var nodes = buildRanvierNodeIndices(myelin);
+    var energy = c.startEnergy;
 
     if (n < 2) {
         return {
             ok: false,
-            energy: c.startEnergy,
-            voltage: c.startVmV,
-            minVoltage: c.startVmV,
+            energy: energy,
+            voltage: c.startVoltage,
+            peakVoltage: c.startVoltage,
             steps: steps,
             failReason: "no_path",
             nodes: nodes,
@@ -69,38 +83,25 @@ function simulate(myelin, cfg) {
         };
     }
 
-    var V = c.startVmV;
-    var energy = c.startEnergy;
-    var minV = V;
+    var V = c.startVoltage;
+    var peakV = V;
 
     for (var i = 0; i < n; i++) {
         var kind = segmentKind(myelin, i, n);
         var vBefore = V;
-        var nodeFlash = false;
-        var regen = false;
 
-        if (kind === "MYELIN") {
-            V -= c.decayMyelinMv;
-        } else if (kind === "NODE") {
-            if (i === 0) {
-                V = c.regenVmV;
-                regen = true;
-            } else if (i === n - 1) {
-                V = c.regenVmV;
-                regen = true;
-                nodeFlash = true;
-            } else {
-                energy -= c.nodeAtpCost;
-                V = c.regenVmV;
-                regen = true;
-                nodeFlash = true;
-            }
-        } else {
-            V -= c.decayLeakyMv;
-        }
+        if (kind === "MYELIN")
+            V += c.myelinBoost;
+        else if (kind === "NODE")
+            V += c.nodePenalty;
+        else
+            V += c.leakPenalty;
 
-        if (V < minV)
-            minV = V;
+        if (V > peakV)
+            peakV = V;
+
+        // Every Ranvier NODE gets a pump/ion accent in playback (sequential nodes included).
+        var nodeFlash = kind === "NODE";
 
         steps.push({
             type: "segment",
@@ -110,51 +111,48 @@ function simulate(myelin, cfg) {
             vAfter: V,
             energyAfter: energy,
             nodeFlash: nodeFlash,
-            regen: regen
+            regen: false
         });
 
-        if (V < c.failVmV) {
-            failReason = "under_voltage";
+        if (V >= c.failIfVoltageGte) {
             return {
                 ok: false,
                 energy: energy,
                 voltage: V,
-                minVoltage: minV,
+                peakVoltage: peakV,
                 steps: steps,
-                failReason: failReason,
-                nodes: nodes,
-                config: c
-            };
-        }
-        if (energy <= 0 && i < n - 1) {
-            failReason = "out_of_energy";
-            return {
-                ok: false,
-                energy: energy,
-                voltage: V,
-                minVoltage: minV,
-                steps: steps,
-                failReason: failReason,
+                failReason: "collapsed",
                 nodes: nodes,
                 config: c
             };
         }
     }
 
-    var win = V > c.failVmV && energy > 0;
+    if (V > c.brainActivationThreshold) {
+        return {
+            ok: false,
+            energy: energy,
+            voltage: V,
+            peakVoltage: peakV,
+            steps: steps,
+            failReason: "insufficient_activation",
+            nodes: nodes,
+            config: c
+        };
+    }
+
     return {
-        ok: win,
+        ok: true,
         energy: energy,
         voltage: V,
-        minVoltage: minV,
+        peakVoltage: peakV,
         steps: steps,
-        failReason: win ? "" : (energy <= 0 ? "out_of_energy" : "under_voltage"),
+        failReason: "",
         nodes: nodes,
         config: c
     };
 }
 
-// Playback legs: pulse sweeps each segment; carries vFrom/vTo for glow interpolation.
 function buildPlaybackTimeline(steps, n) {
     var out = [];
     if (!steps || n < 2)
@@ -168,13 +166,13 @@ function buildPlaybackTimeline(steps, n) {
         var toF = (i + 0.92) / (n - 1);
         if (i === n - 1)
             toF = 1.0;
-        var dur = 185;
-        if (s.kind === "NODE" && s.nodeFlash)
-            dur = 360;
+        var dur = 210;
+        if (s.kind === "MYELIN")
+            dur = 240;
         else if (s.kind === "NODE")
-            dur = 275;
-        else if (s.kind === "LEAKY")
-            dur = 235;
+            dur = s.nodeFlash ? 320 : 280;
+        else
+            dur = 220;
         out.push({
             fromFrac: fromF,
             toFrac: toF,

@@ -1,10 +1,11 @@
-// Axon Signals — simplified Vm + ATP model; Ranvier pumps only; single view.
+// Axon Signals — negative Vm puzzle: nodes pull toward 0 mV, myelin re-deepens; collapse if Vm ≥ 0.
 // Web Dojo: entry file; sibling js/signalSim.js.
 
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
 import "js/signalSim.js" as SignalSim
+import "js/eduFacts.js" as EduFacts
 
 ApplicationWindow {
     id: win
@@ -22,14 +23,15 @@ ApplicationWindow {
     property var myelin: []
     property var lastSim: ({
         ok: false,
-        energy: 0,
-        voltage: -55,
-        minVoltage: -55,
+        energy: 100,
+        voltage: -70,
+        peakVoltage: -70,
         failReason: "",
         steps: [],
-        nodes: []
+        nodes: [],
+        config: { startVoltage: -70, brainActivationThreshold: -55, failIfVoltageGte: 0 }
     })
-    property string statusLine: "Every Ranvier site (gaps + foot/brain) shows pumps and ions; myelin stays clean."
+    property string statusLine: "Nodes (gaps + ends) pull Vm toward 0; myelin pushes it negative again. Stay below 0 mV; reach the brain at or below −55 mV."
 
     property bool playbackActive: false
     property real signalAlong: 0
@@ -38,6 +40,11 @@ ApplicationWindow {
     property real displayVoltage: -55
     property int nodeSpikeSeg: -1
     property real nodeSpikeBoost: 0
+
+    // Optional "Did you know?" markers + one non-modal tip at a time (see js/eduFacts.js).
+    property bool learningMode: true
+    property string eduTipTopic: ""
+    property var eduTipAnchor: null
 
     function defaultMyelinPattern() {
         var arr = [];
@@ -57,7 +64,8 @@ ApplicationWindow {
         playbackFailBlend = 0;
         nodeSpikeSeg = -1;
         nodeSpikeBoost = 0;
-        displayVoltage = -55;
+        displayVoltage = (lastSim.config && lastSim.config.startVoltage !== undefined)
+                ? lastSim.config.startVoltage : -70;
     }
 
     function startSignalPlayback() {
@@ -78,7 +86,7 @@ ApplicationWindow {
         stopPlayback();
         myelin = defaultMyelinPattern();
         refreshPreview();
-        statusLine = "Foot → Brain: myelin decays Vm slowly; Ranvier nodes spend ATP and reset Vm to −55 mV.";
+        statusLine = "Foot → Brain: myelin re-strengthens Vm (more negative); each Ranvier node relaxes it toward 0. Never reach 0 mV.";
     }
 
     function refreshPreview() {
@@ -93,10 +101,10 @@ ApplicationWindow {
     }
 
     function describeFail(code) {
-        if (code === "under_voltage")
-            return "membrane potential fell past −70 mV.";
-        if (code === "out_of_energy")
-            return "ATP ran out before the signal finished.";
+        if (code === "collapsed")
+            return "Signal collapsed (voltage reached 0)";
+        if (code === "insufficient_activation")
+            return "Signal too weak to activate Brain";
         if (code === "no_path")
             return "axon layout invalid.";
         return "propagation failed.";
@@ -106,9 +114,72 @@ ApplicationWindow {
         return u * u * (3 - 2 * u);
     }
 
-    // Voltage → 0..1 glow headroom above failure threshold (−70 mV), capped toward −50 mV.
-    function voltageGlowNorm(vm) {
-        return Math.max(0, Math.min(1, (vm - (-70)) / ((-50) - (-70))));
+    // More negative Vm → stronger pulse (1). Near 0 mV → weak (approaches 0).
+    function signalStrengthFromV(vm) {
+        return Math.max(0.12, Math.min(1.0, (-vm) / 80.0));
+    }
+
+    // 0 = safe negative Vm; rises toward 1 as Vm approaches 0 from below (collapse risk).
+    function collapseRiskFromV(vm) {
+        return Math.max(0, Math.min(1, (vm + 16) / 16.0));
+    }
+
+    function openLearningTip(topicId, anchorItem) {
+        if (!learningMode || topicId.length === 0)
+            return;
+        eduTipTopic = topicId;
+        eduTipAnchor = anchorItem;
+        eduPopup.open();
+        eduTipRepos.restart();
+        eduAutoClose.restart();
+    }
+
+    function repositionEduPopup() {
+        if (!eduPopup.parent)
+            return;
+        var over = eduPopup.parent;
+        if (!eduTipAnchor) {
+            eduPopup.x = (over.width - eduPopup.width) / 2;
+            eduPopup.y = 72;
+            return;
+        }
+        var p = eduTipAnchor.mapToItem(over, eduTipAnchor.width / 2, eduTipAnchor.height);
+        var w = eduPopup.width;
+        var h = eduPopup.implicitHeight > 0 ? eduPopup.implicitHeight : 110;
+        var nx = p.x - w / 2;
+        nx = Math.max(10, Math.min(over.width - w - 10, nx));
+        var ny = p.y + 8;
+        ny = Math.max(10, Math.min(over.height - h - 10, ny));
+        eduPopup.x = nx;
+        eduPopup.y = ny;
+    }
+
+    onLearningModeChanged: {
+        if (!learningMode) {
+            eduAutoClose.stop();
+            eduPopup.close();
+        }
+    }
+
+    onPlaybackActiveChanged: {
+        if (playbackActive) {
+            eduAutoClose.stop();
+            eduPopup.close();
+        }
+    }
+
+    Timer {
+        id: eduTipRepos
+        interval: 1
+        repeat: false
+        onTriggered: win.repositionEduPopup()
+    }
+
+    Timer {
+        id: eduAutoClose
+        interval: 9000
+        repeat: false
+        onTriggered: eduPopup.close()
     }
 
     Timer {
@@ -139,11 +210,13 @@ ApplicationWindow {
             win.signalAlong = leg.fromFrac + (leg.toFrac - leg.fromFrac) * sm;
             win.displayVoltage = leg.vFrom + (leg.vTo - leg.vFrom) * sm;
 
-            if (leg.nodeFlash)
+            if (leg.kind === "NODE") {
                 win.nodeSpikeBoost = Math.max(0, 1 - Math.abs(legU - 0.5) * 2.35);
-            else
+                win.nodeSpikeSeg = leg.segIndex;
+            } else {
                 win.nodeSpikeBoost = 0;
-            win.nodeSpikeSeg = leg.nodeFlash ? leg.segIndex : -1;
+                win.nodeSpikeSeg = -1;
+            }
 
             if (legU >= 1.0) {
                 legU = 0;
@@ -155,8 +228,12 @@ ApplicationWindow {
                     win.displayVoltage = win.lastSim.voltage;
                     win.playbackActive = false;
                     running = false;
-                    if (win.lastSim.ok)
-                        win.statusLine = "Success — Vm and ATP both healthy at the soma.";
+                    if (win.lastSim.ok) {
+                        var thr = (win.lastSim.config && win.lastSim.config.brainActivationThreshold !== undefined)
+                                ? win.lastSim.config.brainActivationThreshold : -55;
+                        win.statusLine = "Success — Vm reached the brain at or below "
+                                + Math.round(thr * 10) / 10 + " mV without collapsing.";
+                    }
                     else
                         win.statusLine = "Failed — " + win.describeFail(win.lastSim.failReason);
                     win.refreshPreview();
@@ -165,8 +242,11 @@ ApplicationWindow {
                 leg = timeline[legIndex];
                 win.displayVoltage = leg.vFrom;
             }
-            if (!win.lastSim.ok && legIndex >= timeline.length - 1)
-                win.playbackFailBlend = Math.min(1, win.playbackFailBlend + 0.03);
+            if (!win.lastSim.ok && leg.kind !== "MYELIN"
+                    && win.collapseRiskFromV(win.displayVoltage) > 0.25)
+                win.playbackFailBlend = Math.min(1, win.playbackFailBlend + 0.045);
+            else if (!win.lastSim.ok && legIndex >= timeline.length - 1)
+                win.playbackFailBlend = Math.min(1, win.playbackFailBlend + 0.02);
         }
     }
 
@@ -181,7 +261,7 @@ ApplicationWindow {
     ColumnLayout {
         id: mainCol
         anchors.fill: parent
-        anchors.margins: 18
+        anchors.margins: 12
         spacing: 10
 
         RowLayout {
@@ -195,27 +275,47 @@ ApplicationWindow {
             }
             Item { Layout.fillWidth: true }
             Label {
-                text: "ATP: <b>" + Math.round(lastSim.energy * 10) / 10 + "</b>"
+                text: "Start: <b>" + ((lastSim.config && lastSim.config.startVoltage !== undefined)
+                        ? Math.round(lastSim.config.startVoltage * 10) / 10 : -70) + " mV</b>"
+                color: "#9fd7ff"
+                textFormat: Text.RichText
+                font.pixelSize: 12
+            }
+            Label {
+                text: "Brain ≤ <b>" + ((lastSim.config && lastSim.config.brainActivationThreshold !== undefined)
+                        ? Math.round(lastSim.config.brainActivationThreshold * 10) / 10 : -55) + " mV</b>"
+                color: "#d49bff"
+                textFormat: Text.RichText
+                font.pixelSize: 12
+            }
+            Label {
+                text: "Vm: <b>" + Math.round((win.playbackActive ? win.displayVoltage : win.lastSim.voltage) * 10) / 10 + " mV</b>"
                 color: "#7cf5c6"
                 textFormat: Text.RichText
                 font.pixelSize: 13
             }
             Label {
-                text: "Vm (end): <b>" + Math.round(lastSim.voltage * 10) / 10 + " mV</b>"
-                color: "#9fd7ff"
-                textFormat: Text.RichText
-                font.pixelSize: 13
-            }
-            Label {
-                text: "Vm min: <b>" + Math.round(lastSim.minVoltage * 10) / 10 + " mV</b>"
+                text: "Peak→0: <b>" + Math.round(lastSim.peakVoltage * 10) / 10 + " mV</b>"
                 color: "#c8b8ff"
                 textFormat: Text.RichText
-                font.pixelSize: 12
+                font.pixelSize: 11
+            }
+            Label {
+                text: "End Vm: <b>" + Math.round(lastSim.voltage * 10) / 10 + " mV</b>"
+                color: "#8ec5ff"
+                textFormat: Text.RichText
+                font.pixelSize: 11
             }
             Label {
                 text: lastSim.ok ? "<span style='color:#9af'>OK</span>" : "<span style='color:#f88'>Risk</span>"
                 textFormat: Text.RichText
                 font.pixelSize: 13
+            }
+            Button {
+                text: win.learningMode ? "Learning mode: ON" : "Learning mode: OFF"
+                flat: true
+                font.pixelSize: 11
+                onClicked: win.learningMode = !win.learningMode
             }
         }
 
@@ -241,8 +341,8 @@ ApplicationWindow {
             Item {
                 id: axonBand
                 Layout.alignment: Qt.AlignHCenter
-                Layout.preferredWidth: Math.min(axonTrackWidth, Math.max(200, mainCol.width - 120))
-                Layout.minimumWidth: 160
+                Layout.preferredWidth: Math.min(axonTrackWidth, Math.max(180, mainCol.width - 96))
+                Layout.minimumWidth: 140
                 height: 156
                 clip: false
 
@@ -288,9 +388,9 @@ ApplicationWindow {
                                         index - win.signalAlong * (win.segmentCount - 1))
                                     readonly property bool nearPulse: win.playbackActive && sigDist < 0.95
 
-                                    readonly property real vNorm: win.playbackActive
-                                            ? win.voltageGlowNorm(win.displayVoltage)
-                                            : win.voltageGlowNorm(win.lastSim.voltage)
+                                    readonly property real vmRef: win.playbackActive ? win.displayVoltage : win.lastSim.voltage
+                                    readonly property real sigStrength: win.signalStrengthFromV(vmRef)
+                                    readonly property real collapseRisk: win.collapseRiskFromV(vmRef)
                                     readonly property real pulseBase: {
                                         if (!win.playbackActive)
                                             return 0;
@@ -298,8 +398,14 @@ ApplicationWindow {
                                             return 0.72 * (1 - sigDist / 0.48);
                                         return 0;
                                     }
-                                    readonly property real pulseGlow: pulseBase * (0.35 + 0.65 * vNorm) * (1 - 0.55 * win.playbackFailBlend)
                                     readonly property real spikeBoost: (win.nodeSpikeSeg === index) ? win.nodeSpikeBoost * 0.95 : 0
+                                    readonly property real pulseGlow: {
+                                        // No high-frequency flicker on MYELIN — calmer propagation leg.
+                                        var flick = (!isMyelin && collapseRisk > 0.2)
+                                                ? 0.14 * collapseRisk * Math.abs(Math.sin(win.ionClock * 10.7))
+                                                : 0;
+                                        return pulseBase * sigStrength * (1 - 0.62 * collapseRisk) * (1 - 0.45 * win.playbackFailBlend) + spikeBoost + flick;
+                                    }
 
                                     Rectangle {
                                         anchors.horizontalCenter: parent.horizontalCenter
@@ -480,8 +586,8 @@ ApplicationWindow {
                                         color: "transparent"
                                         border.width: 2
                                         border.color: Qt.rgba(0.35, 0.95, 1.0,
-                                            0.12 + 0.78 * pulseGlow + 0.55 * spikeBoost)
-                                        opacity: 0.2 + pulseGlow * 0.75 + spikeBoost * 0.5
+                                            0.1 + 0.82 * pulseGlow + 0.5 * spikeBoost)
+                                        opacity: 0.18 + pulseGlow * 0.78 + spikeBoost * 0.48
                                     }
 
                                     Label {
@@ -506,6 +612,78 @@ ApplicationWindow {
                                             win.myelin = copy;
                                         }
                                     }
+
+                                    Loader {
+                                        z: 22
+                                        active: win.learningMode && isMyelin
+                                        width: active ? 13 : 0
+                                        height: active ? 13 : 0
+                                        anchors.top: parent.top
+                                        anchors.right: parent.right
+                                        anchors.topMargin: 2
+                                        anchors.rightMargin: 1
+                                        source: Qt.resolvedUrl("LearningMarker.qml")
+                                        onLoaded: {
+                                            item.topicId = "myelin";
+                                            item.glowColor = "#58e8a0";
+                                            item.learningOn = Qt.binding(function () {
+                                                return win.learningMode;
+                                            });
+                                            item.clock = Qt.binding(function () {
+                                                return win.ionClock;
+                                            });
+                                            item.tipOpenRequested.connect(function (tid, anch) {
+                                                win.openLearningTip(tid, anch);
+                                            });
+                                        }
+                                    }
+                                    Loader {
+                                        z: 22
+                                        active: win.learningMode && isNode
+                                        width: active ? 13 : 0
+                                        height: active ? 13 : 0
+                                        anchors.top: parent.top
+                                        anchors.left: parent.left
+                                        anchors.topMargin: 2
+                                        anchors.leftMargin: 1
+                                        source: Qt.resolvedUrl("LearningMarker.qml")
+                                        onLoaded: {
+                                            item.topicId = "ranvier_node";
+                                            item.glowColor = "#ff9a4d";
+                                            item.learningOn = Qt.binding(function () {
+                                                return win.learningMode;
+                                            });
+                                            item.clock = Qt.binding(function () {
+                                                return win.ionClock;
+                                            });
+                                            item.tipOpenRequested.connect(function (tid, anch) {
+                                                win.openLearningTip(tid, anch);
+                                            });
+                                        }
+                                    }
+                                    Loader {
+                                        z: 22
+                                        active: win.learningMode && showEnzymes
+                                        width: active ? 13 : 0
+                                        height: active ? 13 : 0
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        anchors.rightMargin: 0
+                                        source: Qt.resolvedUrl("LearningMarker.qml")
+                                        onLoaded: {
+                                            item.topicId = "pump";
+                                            item.glowColor = "#8eb6ff";
+                                            item.learningOn = Qt.binding(function () {
+                                                return win.learningMode;
+                                            });
+                                            item.clock = Qt.binding(function () {
+                                                return win.ionClock;
+                                            });
+                                            item.tipOpenRequested.connect(function (tid, anch) {
+                                                win.openLearningTip(tid, anch);
+                                            });
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -524,6 +702,27 @@ ApplicationWindow {
 
         RowLayout {
             spacing: 10
+            Loader {
+                id: signalTipLoader
+                Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: win.learningMode ? 16 : 0
+                Layout.preferredHeight: win.learningMode ? 16 : 0
+                active: win.learningMode
+                source: Qt.resolvedUrl("LearningMarker.qml")
+                onLoaded: {
+                    item.topicId = "signal";
+                    item.glowColor = "#7cf5c6";
+                    item.learningOn = Qt.binding(function () {
+                        return win.learningMode;
+                    });
+                    item.clock = Qt.binding(function () {
+                        return win.ionClock;
+                    });
+                    item.tipOpenRequested.connect(function (tid, anch) {
+                        win.openLearningTip(tid, anch);
+                    });
+                }
+            }
             Button {
                 text: win.playbackActive ? "Running…" : "Send Signal"
                 highlighted: true
@@ -532,8 +731,8 @@ ApplicationWindow {
                     win.stopPlayback();
                     win.lastSim = SignalSim.simulate(win.myelin, null);
                     win.statusLine = win.lastSim.ok
-                            ? "Send: Vm holds above −70 mV and ATP > 0 at the brain — watch the pulse."
-                            : "Risk: long myelin runs leak Vm; every real node spends ATP to reset Vm to −55 mV.";
+                            ? "Send: keep Vm below 0 mV and finish the brain at or below −55 mV."
+                            : "Risk: too many nodes drag Vm toward 0; myelin must pull it negative again before collapse.";
                     win.startSignalPlayback();
                 }
             }
@@ -547,6 +746,80 @@ ApplicationWindow {
                 font.pixelSize: 11
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
+            }
+        }
+    }
+
+    Popup {
+        id: eduPopup
+        parent: win.overlay
+        modal: false
+        focus: false
+        padding: 12
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        width: Math.min(340, win.overlay ? win.overlay.width - 24 : win.width - 24)
+
+        onClosed: {
+            eduAutoClose.stop();
+            win.eduTipTopic = "";
+            win.eduTipAnchor = null;
+        }
+
+        onWidthChanged: if (visible)
+            win.repositionEduPopup()
+        onImplicitHeightChanged: if (visible)
+            win.repositionEduPopup()
+
+        background: Rectangle {
+            color: "#0a101c"
+            border.color: "#3d6a9e"
+            border.width: 1
+            radius: 10
+
+            Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.margins: 1
+                width: 4
+                height: parent.height - 2
+                radius: 2
+                color: "#2ed3ff"
+                opacity: 0.35
+            }
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 8
+            width: eduPopup.availableWidth
+
+            Label {
+                text: EduFacts.titleFor(win.eduTipTopic)
+                color: "#9fd7ff"
+                font.pixelSize: 11
+                font.bold: true
+                font.capitalization: Font.AllUppercase
+                letterSpacing: 0.6
+                Layout.fillWidth: true
+            }
+            Label {
+                text: EduFacts.textFor(win.eduTipTopic)
+                color: "#d4e4f5"
+                font.pixelSize: 12
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+            }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+                Item {
+                    Layout.fillWidth: true
+                }
+                Button {
+                    text: "Got it"
+                    flat: true
+                    font.pixelSize: 11
+                    onClicked: eduPopup.close()
+                }
             }
         }
     }
