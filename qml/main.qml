@@ -29,7 +29,7 @@ ApplicationWindow {
         steps: [],
         nodes: []
     })
-    property string statusLine: "Toggle myelin so Ranvier gaps sit between sheaths — pumps only appear there."
+    property string statusLine: "Every Ranvier site (gaps + foot/brain) shows pumps and ions; myelin stays clean."
 
     property bool playbackActive: false
     property real signalAlong: 0
@@ -279,6 +279,10 @@ ApplicationWindow {
                                     readonly property bool isMyelin: segKind === "MYELIN"
                                     readonly property bool isNode: segKind === "NODE"
                                     readonly property bool isLeak: segKind === "LEAKY"
+                                    // True for foot, brain, and every internode Ranvier gap (myelin on both sides).
+                                    readonly property bool showEnzymes: SignalSim.isRanvierNode(win.myelin, index, win.segmentCount)
+                                    readonly property bool isRanvierGap: !isEnd && !win.myelin[index]
+                                            && win.myelin[index - 1] && win.myelin[index + 1]
 
                                     readonly property real sigDist: Math.abs(
                                         index - win.signalAlong * (win.segmentCount - 1))
@@ -345,7 +349,7 @@ ApplicationWindow {
                                     }
 
                                     Column {
-                                        visible: isNode
+                                        visible: isRanvierGap
                                         anchors.centerIn: parent
                                         spacing: 5
                                         Repeater {
@@ -371,17 +375,18 @@ ApplicationWindow {
                                     }
 
                                     Item {
-                                        visible: isNode
+                                        z: 8
+                                        visible: showEnzymes
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.top: parent.top
-                                        anchors.topMargin: 5
-                                        width: 24
-                                        height: 24
+                                        anchors.topMargin: isEnd ? 4 : 5
+                                        width: isEnd ? 26 : 24
+                                        height: isEnd ? 26 : 24
                                         Rectangle {
-                                            x: 1
-                                            y: 3
-                                            width: 9
-                                            height: 15
+                                            x: isEnd ? 2 : 1
+                                            y: isEnd ? 2 : 3
+                                            width: isEnd ? 10 : 9
+                                            height: isEnd ? 16 : 15
                                             radius: 3
                                             color: (nearPulse || spikeBoost > 0.2) ? "#8eb6ff" : "#4d6aa8"
                                             border.color: "#bcd6ff"
@@ -392,14 +397,14 @@ ApplicationWindow {
                                                 axis: Qt.vector3d(0, 0, 1)
                                                 angle: (nearPulse || spikeBoost > 0.15)
                                                         ? 14 * Math.sin(win.ionClock * 2.4)
-                                                        : 3 * Math.sin(win.ionClock * 0.85)
+                                                        : (isEnd ? 5 : 3) * Math.sin(win.ionClock * 0.85)
                                             }
                                         }
                                         Rectangle {
-                                            x: 13
-                                            y: 3
-                                            width: 9
-                                            height: 15
+                                            x: isEnd ? 14 : 13
+                                            y: isEnd ? 2 : 3
+                                            width: isEnd ? 10 : 9
+                                            height: isEnd ? 16 : 15
                                             radius: 3
                                             color: (nearPulse || spikeBoost > 0.2) ? "#a8c4ff" : "#556db0"
                                             border.color: "#dce8ff"
@@ -410,26 +415,28 @@ ApplicationWindow {
                                                 axis: Qt.vector3d(0, 0, 1)
                                                 angle: (nearPulse || spikeBoost > 0.15)
                                                         ? -12 * Math.sin(win.ionClock * 2.1 + 0.3)
-                                                        : -2.5 * Math.sin(win.ionClock * 0.8)
+                                                        : (isEnd ? -4 : -2.5) * Math.sin(win.ionClock * 0.8)
                                             }
                                         }
                                         Rectangle {
                                             anchors.centerIn: parent
-                                            width: 5
-                                            height: 5
+                                            width: isEnd ? 6 : 5
+                                            height: isEnd ? 6 : 5
                                             radius: 2.5
                                             color: "#ffff99"
-                                            opacity: spikeBoost > 0.1 ? 0.5 + 0.45 * spikeBoost : (nearPulse ? 0.35 : 0.1)
+                                            opacity: spikeBoost > 0.1 ? 0.55 + 0.4 * spikeBoost
+                                                                   : (nearPulse ? 0.38 : (isEnd ? 0.22 : 0.12))
                                         }
                                     }
 
                                     Item {
-                                        visible: isNode
+                                        z: 9
+                                        visible: showEnzymes
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
-                                        anchors.bottomMargin: 8
-                                        width: 22
-                                        height: 20
+                                        anchors.bottomMargin: isEnd ? 6 : 8
+                                        width: isEnd ? 24 : 22
+                                        height: isEnd ? 22 : 20
                                         Rectangle {
                                             width: 4
                                             height: 4
@@ -465,6 +472,7 @@ ApplicationWindow {
                                     }
 
                                     Rectangle {
+                                        z: 4
                                         anchors.centerIn: parent
                                         width: 20
                                         height: 84
@@ -477,6 +485,7 @@ ApplicationWindow {
                                     }
 
                                     Label {
+                                        z: 12
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
                                         anchors.bottomMargin: 1
@@ -486,6 +495,7 @@ ApplicationWindow {
                                     }
 
                                     MouseArea {
+                                        z: 15
                                         anchors.fill: parent
                                         enabled: !isEnd && !win.playbackActive
                                         hoverEnabled: true
@@ -532,7 +542,7 @@ ApplicationWindow {
                 onClicked: win.resetLevel()
             }
             Label {
-                text: "Click interior cells to toggle myelin. Pumps / ions only at Ranvier gaps (between sheaths) and ends. Track width scales with segment count."
+                text: "Click interior cells to toggle myelin. Pumps + ions on every Ranvier site (gaps between sheaths, foot, brain). Track width scales with segment count."
                 color: "#7a8699"
                 font.pixelSize: 11
                 Layout.fillWidth: true
