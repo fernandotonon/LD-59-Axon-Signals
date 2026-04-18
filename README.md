@@ -1,6 +1,6 @@
 # Axon Signals (LD prototype)
 
-Toggle myelin on a discrete axon (click segments), then watch a short 3D-style playback of the signal racing toward the brain.
+Toggle myelin on a discrete axon (click segments), send the signal, and watch the pulse travel in the **same** view with lightweight membrane, pump, and ion cues (suggestive biology, not a simulation).
 
 ## Play in the browser (Web Dojo)
 
@@ -17,7 +17,7 @@ No install needed for players. The game is plain **QML + JavaScript**; [Web Dojo
 
 3. Click **Run** (or use **auto-reload** if you develop with [`clay-dev-server`](https://clayground.mistergc.dev/docs/getting-started/webdojo/)).
 
-Relative imports (`Playback3D.qml`, `js/signalSim.js`) resolve next to that URL, so no extra steps as long as those files sit beside `main.qml` in the repo.
+Relative imports (`js/signalSim.js`) resolve next to `main.qml` on that host; only `main.qml` + `qml/js/` are required for Web Dojo.
 
 ### Share a short link
 

@@ -185,3 +185,30 @@ function simulate(myelin, cfg) {
         config: c
     };
 }
+
+// Inline playback: animation legs derived from simulate() jump steps (0..1 along axon).
+function buildPlaybackTimeline(steps, n) {
+    var out = [];
+    if (!steps || n < 2)
+        return out;
+    for (var i = 0; i < steps.length; i++) {
+        var s = steps[i];
+        if (s.type !== "jump")
+            continue;
+        var toFrac = (n <= 1) ? 0 : s.to / (n - 1);
+        var fromF = (n <= 1) ? 0 : s.from / (n - 1);
+        var dist = s.dist || 1;
+        var myel = s.myelinatedFraction != null ? s.myelinatedFraction : 0.5;
+        var cost = s.cost != null ? s.cost : 1;
+        var durationMs = 320 + dist * 95 + cost * 26 - myel * 220;
+        if (s.doomed)
+            durationMs *= 1.55;
+        durationMs = Math.max(220, Math.min(2000, durationMs));
+        out.push({
+            fromFrac: fromF,
+            toFrac: toFrac,
+            durationMs: durationMs
+        });
+    }
+    return out;
+}
