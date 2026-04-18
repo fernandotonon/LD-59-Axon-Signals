@@ -304,14 +304,18 @@ ApplicationWindow {
                                     width: win.cellOuterWidth
                                     height: axonRow.height
 
-                                    readonly property bool isEnd: index === 0 || index === win.segmentCount - 1
+                                    // Repeater delegate `index`; must not use bare `index` after a nested Repeater —
+                                    // inner repeaters can shadow it so win.myelin[index] reads wrong segments (blank UI).
+                                    readonly property int axonIndex: index
+
+                                    readonly property bool isEnd: axonIndex === 0 || axonIndex === win.segmentCount - 1
                                     // UI must use myelin[] only, not SignalSim.segmentKind: pragma-library JS can cache
                                     // an older model (e.g. LEAKY) so pumps/stripes would stay wrong until full restart.
-                                    readonly property bool isMyelin: !!win.myelin[index]
+                                    readonly property bool isMyelin: !!win.myelin[axonIndex]
                                     readonly property bool isRanvier: !isMyelin
 
                                     readonly property real sigDist: Math.abs(
-                                        index - win.signalAlong * (win.segmentCount - 1))
+                                        axonIndex - win.signalAlong * (win.segmentCount - 1))
                                     readonly property bool nearPulse: win.playbackActive && sigDist < 0.95
 
                                     readonly property real vmRef: win.playbackActive ? win.displayVoltage : win.lastSim.voltage
@@ -324,7 +328,7 @@ ApplicationWindow {
                                             return 0.72 * (1 - sigDist / 0.48);
                                         return 0;
                                     }
-                                    readonly property real spikeBoost: (win.nodeSpikeSeg === index) ? win.nodeSpikeBoost * 0.95 : 0
+                                    readonly property real spikeBoost: (win.nodeSpikeSeg === axonIndex) ? win.nodeSpikeBoost * 0.95 : 0
                                     readonly property real pulseGlow: {
                                         // No high-frequency flicker on MYELIN - calmer propagation leg.
                                         var flick = (!isMyelin && collapseRisk > 0.2)
@@ -384,15 +388,33 @@ ApplicationWindow {
                                         visible: isRanvier
                                         anchors.centerIn: parent
                                         spacing: 5
-                                        Repeater {
-                                            model: 4
-                                            Rectangle {
-                                                width: 9
-                                                height: 2
-                                                radius: 1
-                                                color: "#ffb070"
-                                                opacity: 0.4 + index * 0.14
-                                            }
+                                        Rectangle {
+                                            width: 9
+                                            height: 2
+                                            radius: 1
+                                            color: "#ffb070"
+                                            opacity: 0.4
+                                        }
+                                        Rectangle {
+                                            width: 9
+                                            height: 2
+                                            radius: 1
+                                            color: "#ffb070"
+                                            opacity: 0.54
+                                        }
+                                        Rectangle {
+                                            width: 9
+                                            height: 2
+                                            radius: 1
+                                            color: "#ffb070"
+                                            opacity: 0.68
+                                        }
+                                        Rectangle {
+                                            width: 9
+                                            height: 2
+                                            radius: 1
+                                            color: "#ffb070"
+                                            opacity: 0.82
                                         }
                                     }
 
@@ -474,7 +496,7 @@ ApplicationWindow {
                                             height: 4
                                             radius: 2
                                             color: "#ffd54a"
-                                            x: 2 + 2 * Math.sin(win.ionClock + index)
+                                            x: 2 + 2 * Math.sin(win.ionClock + axonIndex)
                                             y: 4 + (nearPulse ? 5 * Math.sin(win.ionClock * 4) : 2 * Math.sin(win.ionClock))
                                         }
                                         Rectangle {
@@ -522,7 +544,7 @@ ApplicationWindow {
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
                                         anchors.bottomMargin: 1
-                                        text: index === 0 ? "F" : (index === win.segmentCount - 1 ? "B" : "")
+                                        text: axonIndex === 0 ? "F" : (axonIndex === win.segmentCount - 1 ? "B" : "")
                                         color: "#9fe8ff"
                                         font.pixelSize: 8
                                     }
@@ -535,7 +557,7 @@ ApplicationWindow {
                                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                         onClicked: {
                                             var copy = win.myelin.slice();
-                                            copy[index] = !copy[index];
+                                            copy[axonIndex] = !copy[axonIndex];
                                             win.myelin = copy;
                                         }
                                     }
