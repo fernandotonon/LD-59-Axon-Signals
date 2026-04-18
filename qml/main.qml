@@ -1,11 +1,10 @@
 // Axon Signals — negative Vm puzzle: nodes pull toward 0 mV, myelin re-deepens; collapse if Vm ≥ 0.
 // Web Dojo: entry file; sibling js/signalSim.js.
 
-import QtQuick 2.15
-import QtQuick.Controls 2.15
-import QtQuick.Layouts 1.15
+import QtQuick 2.12
+import QtQuick.Controls 2.12
+import QtQuick.Layouts 1.12
 import "js/signalSim.js" as SignalSim
-import "js/eduFacts.js" as EduFacts
 
 ApplicationWindow {
     id: win
@@ -41,7 +40,7 @@ ApplicationWindow {
     property int nodeSpikeSeg: -1
     property real nodeSpikeBoost: 0
 
-    // Optional "Did you know?" markers + one non-modal tip at a time (see js/eduFacts.js).
+    // Optional "Did you know?" markers + tip overlay (copy in signalSim.js: eduTextFor / eduTitleFor).
     property bool learningMode: true
     property string eduTipTopic: ""
     property var eduTipAnchor: null
@@ -124,48 +123,49 @@ ApplicationWindow {
         return Math.max(0, Math.min(1, (vm + 16) / 16.0));
     }
 
+    function closeLearningTip() {
+        eduAutoClose.stop();
+        eduTipTopic = "";
+        eduTipAnchor = null;
+    }
+
     function openLearningTip(topicId, anchorItem) {
         if (!learningMode || topicId.length === 0)
             return;
         eduTipTopic = topicId;
         eduTipAnchor = anchorItem;
-        eduPopup.open();
         eduTipRepos.restart();
         eduAutoClose.restart();
     }
 
     function repositionEduPopup() {
-        if (!eduPopup.parent)
+        if (!eduTipLayer || !eduTipPanel)
             return;
-        var over = eduPopup.parent;
+        var over = eduTipLayer;
+        var w = eduTipPanel.width;
+        var h = eduTipPanel.height > 0 ? eduTipPanel.height : 110;
         if (!eduTipAnchor) {
-            eduPopup.x = (over.width - eduPopup.width) / 2;
-            eduPopup.y = 72;
+            eduTipPanel.x = (over.width - w) / 2;
+            eduTipPanel.y = 72;
             return;
         }
         var p = eduTipAnchor.mapToItem(over, eduTipAnchor.width / 2, eduTipAnchor.height);
-        var w = eduPopup.width;
-        var h = eduPopup.implicitHeight > 0 ? eduPopup.implicitHeight : 110;
         var nx = p.x - w / 2;
         nx = Math.max(10, Math.min(over.width - w - 10, nx));
         var ny = p.y + 8;
         ny = Math.max(10, Math.min(over.height - h - 10, ny));
-        eduPopup.x = nx;
-        eduPopup.y = ny;
+        eduTipPanel.x = nx;
+        eduTipPanel.y = ny;
     }
 
     onLearningModeChanged: {
-        if (!learningMode) {
-            eduAutoClose.stop();
-            eduPopup.close();
-        }
+        if (!learningMode)
+            closeLearningTip();
     }
 
     onPlaybackActiveChanged: {
-        if (playbackActive) {
-            eduAutoClose.stop();
-            eduPopup.close();
-        }
+        if (playbackActive)
+            closeLearningTip();
     }
 
     Timer {
@@ -179,7 +179,7 @@ ApplicationWindow {
         id: eduAutoClose
         interval: 9000
         repeat: false
-        onTriggered: eduPopup.close()
+        onTriggered: win.closeLearningTip()
     }
 
     // Inlined for Web Dojo: sibling QML files are not always fetched; avoid Loader + resolvedUrl.
@@ -198,7 +198,7 @@ ApplicationWindow {
             implicitHeight: 13
             visible: lit
 
-            signal tipOpenRequested(string topicId, Item anchorItem)
+            signal tipOpenRequested(string topicId, var anchorItem)
 
             Rectangle {
                 anchors.centerIn: parent
@@ -826,27 +826,31 @@ ApplicationWindow {
         }
     }
 
-    Popup {
-        id: eduPopup
-        // Web Dojo / WASM: win.overlay is often missing; contentItem always exists.
+    // Plain Item overlay instead of Popup (some WASM builds lack stable Popup/overlay).
+    Item {
+        id: eduTipLayer
         parent: win.contentItem
+        anchors.fill: parent
         z: 100000
-        modal: false
-        focus: false
-        padding: 12
-        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        width: Math.min(340, Math.max(200, win.contentItem.width - 24))
-
-        onClosed: {
-            eduAutoClose.stop();
-            win.eduTipTopic = "";
-            win.eduTipAnchor = null;
+        visible: win.eduTipTopic.length > 0
+        onVisibleChanged: {
+            if (visible)
+                eduTipRepos.restart();
         }
 
-        onWidthChanged: if (visible)
-            win.repositionEduPopup()
+        Rectangle {
+            anchors.fill: parent
+            color: "#aa000000"
+            MouseArea {
+                anchors.fill: parent
+                onClicked: win.closeLearningTip()
+            }
+        }
 
-        background: Rectangle {
+        Rectangle {
+            id: eduTipPanel
+            width: Math.min(340, Math.max(200, eduTipLayer.width - 24))
+            height: eduTipCol.childrenRect.height + 24
             color: "#0a101c"
             border.color: "#3d6a9e"
             border.width: 1
@@ -862,39 +866,43 @@ ApplicationWindow {
                 color: "#2ed3ff"
                 opacity: 0.35
             }
-        }
 
-        contentItem: ColumnLayout {
-            spacing: 8
-            width: eduPopup.availableWidth
-
-            Label {
-                text: EduFacts.titleFor(win.eduTipTopic)
-                color: "#9fd7ff"
-                font.pixelSize: 11
-                font.bold: true
-                font.capitalization: Font.AllUppercase
-                letterSpacing: 0.6
-                Layout.fillWidth: true
-            }
-            Label {
-                text: EduFacts.textFor(win.eduTipTopic)
-                color: "#d4e4f5"
-                font.pixelSize: 12
-                wrapMode: Text.WordWrap
-                Layout.fillWidth: true
-            }
-            RowLayout {
-                Layout.fillWidth: true
+            Column {
+                id: eduTipCol
+                x: 12
+                y: 12
+                width: parent.width - 24
                 spacing: 8
-                Item {
-                    Layout.fillWidth: true
-                }
-                Button {
-                    text: "Got it"
-                    flat: true
+
+                Label {
+                    width: parent.width
+                    text: SignalSim.eduTitleFor(win.eduTipTopic).toUpperCase()
+                    color: "#9fd7ff"
                     font.pixelSize: 11
-                    onClicked: eduPopup.close()
+                    font.bold: true
+                    letterSpacing: 0.6
+                }
+                Label {
+                    width: parent.width
+                    text: SignalSim.eduTextFor(win.eduTipTopic)
+                    color: "#d4e4f5"
+                    font.pixelSize: 12
+                    wrapMode: Text.WordWrap
+                }
+                Row {
+                    width: parent.width
+                    spacing: 8
+                    Item {
+                        width: Math.max(0, parent.width - gotItBtn.width - 8)
+                        height: 1
+                    }
+                    Button {
+                        id: gotItBtn
+                        text: "Got it"
+                        flat: true
+                        font.pixelSize: 11
+                        onClicked: win.closeLearningTip()
+                    }
                 }
             }
         }

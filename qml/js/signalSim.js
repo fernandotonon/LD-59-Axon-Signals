@@ -59,10 +59,8 @@ function simulate(myelin, cfg) {
     for (var key in defaultConfig)
         c[key] = defaultConfig[key];
     if (cfg) {
-        for (var k in cfg) {
-            if (cfg.hasOwnProperty(k))
-                c[k] = cfg[k];
-        }
+        for (var k in cfg)
+            c[k] = cfg[k];
     }
 
     var n = myelin.length;
@@ -186,4 +184,44 @@ function buildPlaybackTimeline(steps, n) {
         });
     }
     return out;
+}
+
+// --- Optional learning copy (keep in this file so Web Dojo loads one .js module) ---
+var eduFacts = [
+    {
+        id: "myelin",
+        title: "Myelin",
+        text: "Did you know? Myelin acts as insulation, allowing signals to travel faster along neurons."
+    },
+    {
+        id: "ranvier_node",
+        title: "Node of Ranvier",
+        text: "Did you know? Nodes of Ranvier are gaps where the signal is actively regenerated."
+    },
+    {
+        id: "pump",
+        title: "Ion pumps",
+        text: "Did you know? Sodium-potassium pumps help restore the balance of ions after a signal passes."
+    },
+    {
+        id: "signal",
+        title: "Neural signal",
+        text: "Did you know? A neural signal is actually an electrical change in voltage across the membrane."
+    }
+];
+
+function eduTextFor(id) {
+    for (var ei = 0; ei < eduFacts.length; ei++) {
+        if (eduFacts[ei].id === id)
+            return eduFacts[ei].text;
+    }
+    return "";
+}
+
+function eduTitleFor(id) {
+    for (var ej = 0; ej < eduFacts.length; ej++) {
+        if (eduFacts[ej].id === id)
+            return eduFacts[ej].title;
+    }
+    return "Fact";
 }
