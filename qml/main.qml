@@ -309,8 +309,6 @@ ApplicationWindow {
                                     // an older model (e.g. LEAKY) so pumps/stripes would stay wrong until full restart.
                                     readonly property bool isMyelin: !!win.myelin[index]
                                     readonly property bool isRanvier: !isMyelin
-                                    readonly property bool showEnzymes: isRanvier
-                                    readonly property bool showRanvierStripes: isRanvier
 
                                     readonly property real sigDist: Math.abs(
                                         index - win.signalAlong * (win.segmentCount - 1))
@@ -383,7 +381,7 @@ ApplicationWindow {
                                     }
 
                                     Column {
-                                        visible: showRanvierStripes
+                                        visible: isRanvier
                                         anchors.centerIn: parent
                                         spacing: 5
                                         Repeater {
@@ -410,17 +408,17 @@ ApplicationWindow {
 
                                     Item {
                                         z: 8
-                                        visible: showEnzymes
+                                        visible: isRanvier
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.top: parent.top
-                                        anchors.topMargin: isEnd ? 4 : 5
-                                        width: isEnd ? 26 : 24
-                                        height: isEnd ? 26 : 24
+                                        anchors.topMargin: 5
+                                        width: 24
+                                        height: 24
                                         Rectangle {
-                                            x: isEnd ? 2 : 1
-                                            y: isEnd ? 2 : 3
-                                            width: isEnd ? 10 : 9
-                                            height: isEnd ? 16 : 15
+                                            x: 1
+                                            y: 3
+                                            width: 9
+                                            height: 15
                                             radius: 3
                                             color: (nearPulse || spikeBoost > 0.2) ? "#8eb6ff" : "#4d6aa8"
                                             border.color: "#bcd6ff"
@@ -431,14 +429,14 @@ ApplicationWindow {
                                                 axis: Qt.vector3d(0, 0, 1)
                                                 angle: (nearPulse || spikeBoost > 0.15)
                                                         ? 14 * Math.sin(win.ionClock * 2.4)
-                                                        : (isEnd ? 5 : 3) * Math.sin(win.ionClock * 0.85)
+                                                        : 3 * Math.sin(win.ionClock * 0.85)
                                             }
                                         }
                                         Rectangle {
-                                            x: isEnd ? 14 : 13
-                                            y: isEnd ? 2 : 3
-                                            width: isEnd ? 10 : 9
-                                            height: isEnd ? 16 : 15
+                                            x: 13
+                                            y: 3
+                                            width: 9
+                                            height: 15
                                             radius: 3
                                             color: (nearPulse || spikeBoost > 0.2) ? "#a8c4ff" : "#556db0"
                                             border.color: "#dce8ff"
@@ -449,28 +447,28 @@ ApplicationWindow {
                                                 axis: Qt.vector3d(0, 0, 1)
                                                 angle: (nearPulse || spikeBoost > 0.15)
                                                         ? -12 * Math.sin(win.ionClock * 2.1 + 0.3)
-                                                        : (isEnd ? -4 : -2.5) * Math.sin(win.ionClock * 0.8)
+                                                        : -2.5 * Math.sin(win.ionClock * 0.8)
                                             }
                                         }
                                         Rectangle {
                                             anchors.centerIn: parent
-                                            width: isEnd ? 6 : 5
-                                            height: isEnd ? 6 : 5
+                                            width: 5
+                                            height: 5
                                             radius: 2.5
                                             color: "#ffff99"
                                             opacity: spikeBoost > 0.1 ? 0.55 + 0.4 * spikeBoost
-                                                                   : (nearPulse ? 0.38 : (isEnd ? 0.22 : 0.12))
+                                                                   : (nearPulse ? 0.38 : 0.12)
                                         }
                                     }
 
                                     Item {
                                         z: 9
-                                        visible: showEnzymes
+                                        visible: isRanvier
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
-                                        anchors.bottomMargin: isEnd ? 6 : 8
-                                        width: isEnd ? 24 : 22
-                                        height: isEnd ? 22 : 20
+                                        anchors.bottomMargin: 8
+                                        width: 22
+                                        height: 20
                                         Rectangle {
                                             width: 4
                                             height: 4
@@ -507,6 +505,7 @@ ApplicationWindow {
 
                                     Rectangle {
                                         z: 4
+                                        visible: isRanvier
                                         anchors.centerIn: parent
                                         width: 20
                                         height: 84
