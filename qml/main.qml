@@ -18,13 +18,9 @@ ApplicationWindow {
     property int cellOuterWidth: 28
     property int axonSpacing: 4
     readonly property int axonTrackWidth: segmentCount * cellOuterWidth + (segmentCount - 1) * axonSpacing + 24
-    // [0,1,...,n-1] so each cell uses modelData as axonIndex (Repeater `index` is unreliable in some runtimes).
-    readonly property var axonIndexModel: {
-        var a = [];
-        for (var k = 0; k < segmentCount; k++)
-            a.push(k);
-        return a;
-    }
+    // Dense [0..n-1] for Repeater; assigned in syncAxonIndices (not a readonly recompute) so Web/Qt builds
+    // do not collapse delegates or mis-bind modelData.
+    property var axonIndices: []
 
     property var myelin: []
     property var lastSim: ({
@@ -47,13 +43,20 @@ ApplicationWindow {
     property int nodeSpikeSeg: -1
     property real nodeSpikeBoost: 0
 
+    function syncAxonIndices() {
+        var a = [];
+        for (var k = 0; k < segmentCount; k++)
+            a.push(k);
+        axonIndices = a;
+    }
+
     function defaultMyelinPattern() {
         var arr = [];
         for (var i = 0; i < segmentCount; i++) {
             if (i === 0 || i === segmentCount - 1)
                 arr.push(false);
             else
-                arr.push(i % 5 !== 0 && i % 5 !== 1);
+                arr.push(!!(i % 5 !== 0 && i % 5 !== 1));
         }
         return arr;
     }
@@ -94,7 +97,12 @@ ApplicationWindow {
         lastSim = SignalSim.simulate(myelin, null);
     }
 
-    Component.onCompleted: resetLevel()
+    Component.onCompleted: {
+        syncAxonIndices();
+        resetLevel();
+    }
+
+    onSegmentCountChanged: syncAxonIndices()
 
     onMyelinChanged: {
         if (!playbackActive)
@@ -304,19 +312,24 @@ ApplicationWindow {
                             x: Math.max(0, (axonFlick.width - width) / 2)
 
                             Repeater {
-                                model: win.axonIndexModel
+                                model: win.axonIndices
 
                                 Item {
                                     id: cell
                                     width: win.cellOuterWidth
                                     height: axonRow.height
 
-                                    readonly property int axonIndex: modelData
+                                    readonly property int axonIndex: ((typeof modelData !== "undefined") && (modelData !== null)) ? modelData : index
 
                                     readonly property bool isEnd: axonIndex === 0 || axonIndex === win.segmentCount - 1
-                                    // UI must use myelin[] only, not SignalSim.segmentKind: pragma-library JS can cache
-                                    // an older model (e.g. LEAKY) so pumps/stripes would stay wrong until full restart.
-                                    readonly property bool isMyelin: !!win.myelin[axonIndex]
+                                    // Bounds + truthy sheath flag (myelin array must be length segmentCount after toggle).
+                                    readonly property bool isMyelin: {
+                                        var m = win.myelin;
+                                        var i = axonIndex;
+                                        if (!m || i < 0 || i >= m.length)
+                                            return false;
+                                        return !!m[i];
+                                    }
                                     readonly property bool isRanvier: !isMyelin
 
                                     readonly property real sigDist: Math.abs(
@@ -575,7 +588,10 @@ ApplicationWindow {
                                         cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
                                         onClicked: {
                                             var copy = win.myelin.slice();
+                                            while (copy.length < win.segmentCount)
+                                                copy.push(false);
                                             copy[axonIndex] = !copy[axonIndex];
+                                            copy[axonIndex] = !!copy[axonIndex];
                                             win.myelin = copy;
                                         }
                                     }
