@@ -1,7 +1,6 @@
 // Axon Signals — negative Vm puzzle: nodes pull toward 0 mV, myelin re-deepens; collapse if Vm ≥ 0.
 // Web Dojo: entry file; sibling js/signalSim.js.
 
-// Match Web Dojo WASM (same as commit 4d133a1 — Qt 2.12 imports fail to load there).
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
@@ -40,11 +39,6 @@ ApplicationWindow {
     property real displayVoltage: -55
     property int nodeSpikeSeg: -1
     property real nodeSpikeBoost: 0
-
-    // Optional "Did you know?" markers + tip overlay (copy in signalSim.js: eduTextFor / eduTitleFor).
-    property bool learningMode: true
-    property string eduTipTopic: ""
-    property var eduTipAnchor: null
 
     function defaultMyelinPattern() {
         var arr = [];
@@ -122,141 +116,6 @@ ApplicationWindow {
     // 0 = safe negative Vm; rises toward 1 as Vm approaches 0 from below (collapse risk).
     function collapseRiskFromV(vm) {
         return Math.max(0, Math.min(1, (vm + 16) / 16.0));
-    }
-
-    function closeLearningTip() {
-        eduAutoClose.stop();
-        eduTipTopic = "";
-        eduTipAnchor = null;
-    }
-
-    function openLearningTip(topicId, anchorItem) {
-        if (!learningMode || topicId.length === 0)
-            return;
-        eduTipTopic = topicId;
-        eduTipAnchor = anchorItem;
-        eduTipRepos.restart();
-        eduAutoClose.restart();
-    }
-
-    function repositionEduPopup() {
-        if (!eduTipLayer || !eduTipPanel)
-            return;
-        var over = eduTipLayer;
-        var w = eduTipPanel.width;
-        var h = eduTipPanel.height > 0 ? eduTipPanel.height : 110;
-        if (!eduTipAnchor) {
-            eduTipPanel.x = (over.width - w) / 2;
-            eduTipPanel.y = 72;
-            return;
-        }
-        var p = eduTipAnchor.mapToItem(over, eduTipAnchor.width / 2, eduTipAnchor.height);
-        var nx = p.x - w / 2;
-        nx = Math.max(10, Math.min(over.width - w - 10, nx));
-        var ny = p.y + 8;
-        ny = Math.max(10, Math.min(over.height - h - 10, ny));
-        eduTipPanel.x = nx;
-        eduTipPanel.y = ny;
-    }
-
-    onLearningModeChanged: {
-        if (!learningMode)
-            closeLearningTip();
-    }
-
-    onPlaybackActiveChanged: {
-        if (playbackActive)
-            closeLearningTip();
-    }
-
-    Timer {
-        id: eduTipRepos
-        interval: 1
-        repeat: false
-        onTriggered: win.repositionEduPopup()
-    }
-
-    Timer {
-        id: eduAutoClose
-        interval: 9000
-        repeat: false
-        onTriggered: win.closeLearningTip()
-    }
-
-    // Inlined for Web Dojo: sibling QML files are not always fetched; avoid Loader + resolvedUrl.
-    Component {
-        id: learningMarkerComp
-        Item {
-            id: lmRoot
-            property bool learningOn: false
-            property string topicId: ""
-            property color glowColor: "#3eb8ff"
-            property real clock: 0
-
-            readonly property bool lit: learningOn && topicId.length > 0
-
-            implicitWidth: 13
-            implicitHeight: 13
-            visible: lit
-
-            signal tipOpenRequested(string topicId, var anchorItem)
-
-            Rectangle {
-                anchors.centerIn: parent
-                width: 18
-                height: 18
-                radius: 9
-                color: lmRoot.glowColor
-                opacity: 0.12 + 0.14 * Math.abs(Math.sin(lmRoot.clock * 2.8))
-            }
-
-            Rectangle {
-                anchors.centerIn: parent
-                width: 12
-                height: 12
-                radius: 6
-                color: "#0f1828"
-                border.width: 1
-                border.color: Qt.lighter(lmRoot.glowColor, 1.25)
-            }
-
-            Text {
-                anchors.centerIn: parent
-                anchors.verticalCenterOffset: -1
-                text: "i"
-                font.pixelSize: 8
-                font.bold: true
-                color: "#c8e8ff"
-            }
-
-            Timer {
-                id: lmHoverOpenDelay
-                interval: 480
-                repeat: false
-                onTriggered: {
-                    if (lmRoot.lit)
-                        lmRoot.tipOpenRequested(lmRoot.topicId, lmRoot);
-                }
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                anchors.margins: -4
-                hoverEnabled: true
-                cursorShape: Qt.PointingHandCursor
-                acceptedButtons: Qt.LeftButton
-                onClicked: {
-                    lmHoverOpenDelay.stop();
-                    if (lmRoot.lit)
-                        lmRoot.tipOpenRequested(lmRoot.topicId, lmRoot);
-                }
-                onEntered: {
-                    if (lmRoot.lit)
-                        lmHoverOpenDelay.restart();
-                }
-                onExited: lmHoverOpenDelay.stop()
-            }
-        }
     }
 
     Timer {
@@ -338,7 +197,7 @@ ApplicationWindow {
     ColumnLayout {
         id: mainCol
         anchors.fill: parent
-        anchors.margins: 12
+        anchors.margins: 18
         spacing: 10
 
         RowLayout {
@@ -387,12 +246,6 @@ ApplicationWindow {
                 text: lastSim.ok ? "<span style='color:#9af'>OK</span>" : "<span style='color:#f88'>Risk</span>"
                 textFormat: Text.RichText
                 font.pixelSize: 13
-            }
-            Button {
-                text: win.learningMode ? "Learning mode: ON" : "Learning mode: OFF"
-                flat: true
-                font.pixelSize: 11
-                onClicked: win.learningMode = !win.learningMode
             }
         }
 
@@ -689,78 +542,6 @@ ApplicationWindow {
                                             win.myelin = copy;
                                         }
                                     }
-
-                                    Loader {
-                                        z: 22
-                                        active: win.learningMode && isMyelin
-                                        width: active ? 13 : 0
-                                        height: active ? 13 : 0
-                                        anchors.top: parent.top
-                                        anchors.right: parent.right
-                                        anchors.topMargin: 2
-                                        anchors.rightMargin: 1
-                                        sourceComponent: learningMarkerComp
-                                        onLoaded: {
-                                            item.topicId = "myelin";
-                                            item.glowColor = "#58e8a0";
-                                            item.learningOn = Qt.binding(function () {
-                                                return win.learningMode;
-                                            });
-                                            item.clock = Qt.binding(function () {
-                                                return win.ionClock;
-                                            });
-                                            item.tipOpenRequested.connect(function (tid, anch) {
-                                                win.openLearningTip(tid, anch);
-                                            });
-                                        }
-                                    }
-                                    Loader {
-                                        z: 22
-                                        active: win.learningMode && isNode
-                                        width: active ? 13 : 0
-                                        height: active ? 13 : 0
-                                        anchors.top: parent.top
-                                        anchors.left: parent.left
-                                        anchors.topMargin: 2
-                                        anchors.leftMargin: 1
-                                        sourceComponent: learningMarkerComp
-                                        onLoaded: {
-                                            item.topicId = "ranvier_node";
-                                            item.glowColor = "#ff9a4d";
-                                            item.learningOn = Qt.binding(function () {
-                                                return win.learningMode;
-                                            });
-                                            item.clock = Qt.binding(function () {
-                                                return win.ionClock;
-                                            });
-                                            item.tipOpenRequested.connect(function (tid, anch) {
-                                                win.openLearningTip(tid, anch);
-                                            });
-                                        }
-                                    }
-                                    Loader {
-                                        z: 22
-                                        active: win.learningMode && showEnzymes
-                                        width: active ? 13 : 0
-                                        height: active ? 13 : 0
-                                        anchors.right: parent.right
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        anchors.rightMargin: 0
-                                        sourceComponent: learningMarkerComp
-                                        onLoaded: {
-                                            item.topicId = "pump";
-                                            item.glowColor = "#8eb6ff";
-                                            item.learningOn = Qt.binding(function () {
-                                                return win.learningMode;
-                                            });
-                                            item.clock = Qt.binding(function () {
-                                                return win.ionClock;
-                                            });
-                                            item.tipOpenRequested.connect(function (tid, anch) {
-                                                win.openLearningTip(tid, anch);
-                                            });
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -779,27 +560,6 @@ ApplicationWindow {
 
         RowLayout {
             spacing: 10
-            Loader {
-                id: signalTipLoader
-                Layout.alignment: Qt.AlignVCenter
-                Layout.preferredWidth: win.learningMode ? 16 : 0
-                Layout.preferredHeight: win.learningMode ? 16 : 0
-                active: win.learningMode
-                sourceComponent: learningMarkerComp
-                onLoaded: {
-                    item.topicId = "signal";
-                    item.glowColor = "#7cf5c6";
-                    item.learningOn = Qt.binding(function () {
-                        return win.learningMode;
-                    });
-                    item.clock = Qt.binding(function () {
-                        return win.ionClock;
-                    });
-                    item.tipOpenRequested.connect(function (tid, anch) {
-                        win.openLearningTip(tid, anch);
-                    });
-                }
-            }
             Button {
                 text: win.playbackActive ? "Running…" : "Send Signal"
                 highlighted: true
@@ -823,88 +583,6 @@ ApplicationWindow {
                 font.pixelSize: 11
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
-            }
-        }
-    }
-
-    // Plain Item overlay instead of Popup (some WASM builds lack stable Popup/overlay).
-    Item {
-        id: eduTipLayer
-        parent: win.contentItem
-        anchors.fill: parent
-        z: 100000
-        visible: win.eduTipTopic.length > 0
-        onVisibleChanged: {
-            if (visible)
-                eduTipRepos.restart();
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            color: "#aa000000"
-            MouseArea {
-                anchors.fill: parent
-                onClicked: win.closeLearningTip()
-            }
-        }
-
-        Rectangle {
-            id: eduTipPanel
-            width: Math.min(340, Math.max(200, eduTipLayer.width - 24))
-            height: eduTipCol.childrenRect.height + 24
-            color: "#0a101c"
-            border.color: "#3d6a9e"
-            border.width: 1
-            radius: 10
-
-            Rectangle {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.margins: 1
-                width: 4
-                height: parent.height - 2
-                radius: 2
-                color: "#2ed3ff"
-                opacity: 0.35
-            }
-
-            Column {
-                id: eduTipCol
-                x: 12
-                y: 12
-                width: parent.width - 24
-                spacing: 8
-
-                Label {
-                    width: parent.width
-                    text: SignalSim.eduTitleFor(win.eduTipTopic).toUpperCase()
-                    color: "#9fd7ff"
-                    font.pixelSize: 11
-                    font.bold: true
-                    letterSpacing: 0.6
-                }
-                Label {
-                    width: parent.width
-                    text: SignalSim.eduTextFor(win.eduTipTopic)
-                    color: "#d4e4f5"
-                    font.pixelSize: 12
-                    wrapMode: Text.WordWrap
-                }
-                Row {
-                    width: parent.width
-                    spacing: 8
-                    Item {
-                        width: Math.max(0, parent.width - gotItBtn.width - 8)
-                        height: 1
-                    }
-                    Button {
-                        id: gotItBtn
-                        text: "Got it"
-                        flat: true
-                        font.pixelSize: 11
-                        onClicked: win.closeLearningTip()
-                    }
-                }
             }
         }
     }
