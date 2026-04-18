@@ -19,9 +19,8 @@ ApplicationWindow {
     property int segmentCount: 26
     property var myelin: []
     property var lastSim: ({ ok: false, energy: 0, failReason: "", steps: [], nodes: [] })
-    property string statusLine: "Paint myelin so saltatory jumps stay strong."
+    property string statusLine: "Click axon segments to toggle myelin vs exposed (node) stretches."
     property bool showPlayback: false
-    property bool paintAdd: true
 
     function defaultMyelinPattern() {
         var arr = [];
@@ -37,7 +36,7 @@ ApplicationWindow {
     function resetLevel() {
         myelin = defaultMyelinPattern();
         refreshPreview();
-        statusLine = "Foot to brain: insulate wisely, leave nodes where you need recharge.";
+        statusLine = "Foot to brain: click segments to toggle myelin — exposed gaps become nodes of Ranvier.";
     }
 
     function refreshPreview() {
@@ -174,7 +173,7 @@ ApplicationWindow {
                             z: 2
                             anchors.fill: parent
                             preventStealing: true
-                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            cursorShape: Qt.PointingHandCursor
 
                             function indexAt(mouseX) {
                                 var s = axonRow.spacing;
@@ -189,26 +188,13 @@ ApplicationWindow {
                                 return -1;
                             }
 
-                            function paintAt(mouseX) {
+                            onClicked: {
                                 var idx = indexAt(mouseX);
                                 if (idx <= 0 || idx >= win.segmentCount - 1)
                                     return;
                                 var copy = win.myelin.slice();
-                                if (copy[idx] === win.paintAdd)
-                                    return;
-                                copy[idx] = win.paintAdd;
+                                copy[idx] = !copy[idx];
                                 win.myelin = copy;
-                            }
-
-                            onPressed: function (mouse) {
-                                win.paintAdd = mouse.button === Qt.LeftButton;
-                                paintAt(mouse.x);
-                            }
-
-                            onPositionChanged: function (mouse) {
-                                if (!pressed)
-                                    return;
-                                paintAt(mouse.x);
                             }
                         }
                     }
@@ -245,7 +231,7 @@ ApplicationWindow {
                 }
 
                 Label {
-                    text: "Left-drag: add myelin · Right-drag: strip · Endpoints fixed as nodes"
+                    text: "Click a segment to toggle myelin (green) ↔ exposed node (copper). Foot and brain stay fixed."
                     color: "#7a8699"
                     font.pixelSize: 11
                     Layout.fillWidth: true

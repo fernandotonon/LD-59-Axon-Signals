@@ -1,6 +1,6 @@
 # Axon Signals (LD prototype)
 
-Paint myelin on a discrete axon, then watch a short 3D-style playback of the signal racing toward the brain.
+Toggle myelin on a discrete axon (click segments), then watch a short 3D-style playback of the signal racing toward the brain.
 
 ## Play in the browser (Web Dojo)
 
