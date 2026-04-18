@@ -18,6 +18,13 @@ ApplicationWindow {
     property int cellOuterWidth: 28
     property int axonSpacing: 4
     readonly property int axonTrackWidth: segmentCount * cellOuterWidth + (segmentCount - 1) * axonSpacing + 24
+    // [0,1,...,n-1] so each cell uses modelData as axonIndex (Repeater `index` is unreliable in some runtimes).
+    readonly property var axonIndexModel: {
+        var a = [];
+        for (var k = 0; k < segmentCount; k++)
+            a.push(k);
+        return a;
+    }
 
     property var myelin: []
     property var lastSim: ({
@@ -297,16 +304,14 @@ ApplicationWindow {
                             x: Math.max(0, (axonFlick.width - width) / 2)
 
                             Repeater {
-                                model: win.segmentCount
+                                model: win.axonIndexModel
 
                                 Item {
                                     id: cell
                                     width: win.cellOuterWidth
                                     height: axonRow.height
 
-                                    // Repeater delegate `index`; must not use bare `index` after a nested Repeater —
-                                    // inner repeaters can shadow it so win.myelin[index] reads wrong segments (blank UI).
-                                    readonly property int axonIndex: index
+                                    readonly property int axonIndex: modelData
 
                                     readonly property bool isEnd: axonIndex === 0 || axonIndex === win.segmentCount - 1
                                     // UI must use myelin[] only, not SignalSim.segmentKind: pragma-library JS can cache
