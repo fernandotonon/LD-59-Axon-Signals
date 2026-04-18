@@ -182,6 +182,82 @@ ApplicationWindow {
         onTriggered: eduPopup.close()
     }
 
+    // Inlined for Web Dojo: sibling QML files are not always fetched; avoid Loader + resolvedUrl.
+    Component {
+        id: learningMarkerComp
+        Item {
+            id: lmRoot
+            property bool learningOn: false
+            property string topicId: ""
+            property color glowColor: "#3eb8ff"
+            property real clock: 0
+
+            readonly property bool lit: learningOn && topicId.length > 0
+
+            implicitWidth: 13
+            implicitHeight: 13
+            visible: lit
+
+            signal tipOpenRequested(string topicId, Item anchorItem)
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 18
+                height: 18
+                radius: 9
+                color: lmRoot.glowColor
+                opacity: 0.12 + 0.14 * Math.abs(Math.sin(lmRoot.clock * 2.8))
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 12
+                height: 12
+                radius: 6
+                color: "#0f1828"
+                border.width: 1
+                border.color: Qt.lighter(lmRoot.glowColor, 1.25)
+            }
+
+            Text {
+                anchors.centerIn: parent
+                anchors.verticalCenterOffset: -1
+                text: "i"
+                font.pixelSize: 8
+                font.bold: true
+                color: "#c8e8ff"
+            }
+
+            Timer {
+                id: lmHoverOpenDelay
+                interval: 480
+                repeat: false
+                onTriggered: {
+                    if (lmRoot.lit)
+                        lmRoot.tipOpenRequested(lmRoot.topicId, lmRoot);
+                }
+            }
+
+            MouseArea {
+                anchors.fill: parent
+                anchors.margins: -4
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                acceptedButtons: Qt.LeftButton
+                onClicked: {
+                    lmHoverOpenDelay.stop();
+                    if (lmRoot.lit)
+                        lmRoot.tipOpenRequested(lmRoot.topicId, lmRoot);
+                }
+                onEntered: {
+                    if (lmRoot.lit)
+                        lmHoverOpenDelay.restart();
+                }
+                onExited: lmHoverOpenDelay.stop()
+            }
+        }
+    }
+
     Timer {
         interval: 48
         repeat: true
@@ -622,7 +698,7 @@ ApplicationWindow {
                                         anchors.right: parent.right
                                         anchors.topMargin: 2
                                         anchors.rightMargin: 1
-                                        source: Qt.resolvedUrl("LearningMarker.qml")
+                                        sourceComponent: learningMarkerComp
                                         onLoaded: {
                                             item.topicId = "myelin";
                                             item.glowColor = "#58e8a0";
@@ -646,7 +722,7 @@ ApplicationWindow {
                                         anchors.left: parent.left
                                         anchors.topMargin: 2
                                         anchors.leftMargin: 1
-                                        source: Qt.resolvedUrl("LearningMarker.qml")
+                                        sourceComponent: learningMarkerComp
                                         onLoaded: {
                                             item.topicId = "ranvier_node";
                                             item.glowColor = "#ff9a4d";
@@ -669,7 +745,7 @@ ApplicationWindow {
                                         anchors.right: parent.right
                                         anchors.verticalCenter: parent.verticalCenter
                                         anchors.rightMargin: 0
-                                        source: Qt.resolvedUrl("LearningMarker.qml")
+                                        sourceComponent: learningMarkerComp
                                         onLoaded: {
                                             item.topicId = "pump";
                                             item.glowColor = "#8eb6ff";
@@ -708,7 +784,7 @@ ApplicationWindow {
                 Layout.preferredWidth: win.learningMode ? 16 : 0
                 Layout.preferredHeight: win.learningMode ? 16 : 0
                 active: win.learningMode
-                source: Qt.resolvedUrl("LearningMarker.qml")
+                sourceComponent: learningMarkerComp
                 onLoaded: {
                     item.topicId = "signal";
                     item.glowColor = "#7cf5c6";
@@ -752,12 +828,14 @@ ApplicationWindow {
 
     Popup {
         id: eduPopup
-        parent: win.overlay
+        // Web Dojo / WASM: win.overlay is often missing; contentItem always exists.
+        parent: win.contentItem
+        z: 100000
         modal: false
         focus: false
         padding: 12
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-        width: Math.min(340, win.overlay ? win.overlay.width - 24 : win.width - 24)
+        width: Math.min(340, Math.max(200, win.contentItem.width - 24))
 
         onClosed: {
             eduAutoClose.stop();
@@ -766,8 +844,6 @@ ApplicationWindow {
         }
 
         onWidthChanged: if (visible)
-            win.repositionEduPopup()
-        onImplicitHeightChanged: if (visible)
             win.repositionEduPopup()
 
         background: Rectangle {
