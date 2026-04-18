@@ -42,34 +42,6 @@ function isRanvierNode(myelin, i, n) {
     return segmentKind(myelin, i, n) === "NODE";
 }
 
-function hasMyelinSomewhereLeft(myelin, i) {
-    for (var a = i - 1; a >= 0; a--) {
-        if (myelin[a])
-            return true;
-    }
-    return false;
-}
-
-function hasMyelinSomewhereRight(myelin, i, n) {
-    for (var b = i + 1; b < n; b++) {
-        if (myelin[b])
-            return true;
-    }
-    return false;
-}
-
-// Pumps/ions: foot, brain, and every unmyelinated segment that lies between sheaths (multi-gap runs too).
-// Stricter `isRanvierNode` (segmentKind NODE) is only the single cell with myelin on both neighbors.
-function shouldShowPumps(myelin, i, n) {
-    if (i < 0 || i >= n)
-        return false;
-    if (myelin[i])
-        return false;
-    if (i === 0 || i === n - 1)
-        return true;
-    return hasMyelinSomewhereLeft(myelin, i) && hasMyelinSomewhereRight(myelin, i, n);
-}
-
 function buildRanvierNodeIndices(myelin) {
     var n = myelin.length;
     var out = [];

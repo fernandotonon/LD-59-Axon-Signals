@@ -87,6 +87,52 @@ ApplicationWindow {
         lastSim = SignalSim.simulate(myelin, null);
     }
 
+    // Pump / gap-striping visibility must use functions on this object (not SignalSim pragmalib):
+    // QML does not track property dependencies for reads inside imported .pragma library JS.
+    function cellShowsPumps(i) {
+        var m = myelin;
+        var n = segmentCount;
+        if (i < 0 || i >= n || m[i])
+            return false;
+        if (i === 0 || i === n - 1)
+            return true;
+        var a, b, L = false, R = false;
+        for (a = i - 1; a >= 0; a--) {
+            if (m[a]) {
+                L = true;
+                break;
+            }
+        }
+        for (b = i + 1; b < n; b++) {
+            if (m[b]) {
+                R = true;
+                break;
+            }
+        }
+        return L && R;
+    }
+
+    function cellShowsGapStriations(i) {
+        var m = myelin;
+        var n = segmentCount;
+        if (i <= 0 || i >= n - 1 || m[i])
+            return false;
+        var a, b, L = false, R = false;
+        for (a = i - 1; a >= 0; a--) {
+            if (m[a]) {
+                L = true;
+                break;
+            }
+        }
+        for (b = i + 1; b < n; b++) {
+            if (m[b]) {
+                R = true;
+                break;
+            }
+        }
+        return L && R;
+    }
+
     Component.onCompleted: resetLevel()
 
     onMyelinChanged: {
@@ -309,10 +355,8 @@ ApplicationWindow {
                                     readonly property bool isMyelin: segKind === "MYELIN"
                                     readonly property bool isNode: segKind === "NODE"
                                     readonly property bool isLeak: segKind === "LEAKY"
-                                    // True for foot, brain, and every internode Ranvier gap (myelin on both sides).
-                                    readonly property bool showEnzymes: SignalSim.shouldShowPumps(win.myelin, index, win.segmentCount)
-                                    readonly property bool isRanvierGap: !isEnd && !win.myelin[index]
-                                            && win.myelin[index - 1] && win.myelin[index + 1]
+                                    readonly property bool showEnzymes: win.cellShowsPumps(index)
+                                    readonly property bool isRanvierGap: win.cellShowsGapStriations(index)
 
                                     readonly property real sigDist: Math.abs(
                                         index - win.signalAlong * (win.segmentCount - 1))
