@@ -43,6 +43,65 @@ ApplicationWindow {
     property int nodeSpikeSeg: -1
     property real nodeSpikeBoost: 0
 
+    property bool learningMode: true
+    property string dykPanelText: ""
+    readonly property var didYouKnowFacts: ({
+        "myelin": "Did you know? Myelin acts as insulation, allowing signals to travel faster along neurons.",
+        "ranvier": "Did you know? Nodes of Ranvier are gaps where the signal is actively regenerated.",
+        "pump": "Did you know? Sodium-potassium pumps help restore the balance of ions after a signal passes.",
+        "signal": "Did you know? A neural signal is actually an electrical change in voltage across the membrane."
+    })
+
+    property string dykHoverArmed: ""
+
+    function showDidYouKnow(key) {
+        if (!learningMode)
+            return;
+        var t = didYouKnowFacts[key];
+        if (!t)
+            return;
+        dykHoverArmed = "";
+        dykHoverTimer.stop();
+        dykPanelText = t;
+        dykAutoClose.restart();
+    }
+
+    function dismissDidYouKnow() {
+        dykPanelText = "";
+        dykAutoClose.stop();
+    }
+
+    function armDykHover(key) {
+        if (!learningMode)
+            return;
+        dykHoverArmed = key;
+        dykHoverTimer.restart();
+    }
+
+    function disarmDykHover(key) {
+        if (dykHoverArmed === key) {
+            dykHoverArmed = "";
+            dykHoverTimer.stop();
+        }
+    }
+
+    Timer {
+        id: dykHoverTimer
+        interval: 420
+        repeat: false
+        onTriggered: {
+            if (win.learningMode && win.dykHoverArmed !== "")
+                win.showDidYouKnow(win.dykHoverArmed);
+        }
+    }
+
+    Timer {
+        id: dykAutoClose
+        interval: 5500
+        repeat: false
+        onTriggered: win.dismissDidYouKnow()
+    }
+
     function syncAxonIndices() {
         var a = [];
         for (var k = 0; k < segmentCount; k++)
@@ -209,6 +268,77 @@ ApplicationWindow {
         }
     }
 
+    MouseArea {
+        z: 9998
+        anchors.fill: parent
+        visible: win.dykPanelText.length > 0
+        acceptedButtons: Qt.AllButtons
+        hoverEnabled: false
+        onClicked: win.dismissDidYouKnow()
+    }
+
+    Rectangle {
+        id: dykPanel
+        z: 10000
+        visible: win.dykPanelText.length > 0
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.top: parent.top
+        anchors.topMargin: 52
+        width: Math.min(440, parent.width - 36)
+        height: Math.min(132, Math.max(50, dykBody.implicitHeight + 26))
+        radius: 10
+        color: "#0c1424"
+        border.width: 1
+        border.color: Qt.rgba(0.35, 0.85, 1.0, 0.55)
+        opacity: 0.97
+
+        Rectangle {
+            z: 0
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: 9
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(0.5, 0.95, 1.0, 0.12)
+        }
+
+        Label {
+            id: dykBody
+            z: 1
+            anchors.left: parent.left
+            anchors.right: closeHit.left
+            anchors.top: parent.top
+            anchors.leftMargin: 14
+            anchors.rightMargin: 6
+            anchors.topMargin: 12
+            text: win.dykPanelText
+            wrapMode: Text.WordWrap
+            color: "#c8dff0"
+            font.pixelSize: 12
+        }
+
+        Item {
+            id: closeHit
+            z: 2
+            width: 28
+            height: 28
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.margins: 6
+            MouseArea {
+                anchors.fill: parent
+                onClicked: win.dismissDidYouKnow()
+                cursorShape: Qt.PointingHandCursor
+            }
+            Label {
+                anchors.centerIn: parent
+                text: "x"
+                color: "#7ad8ff"
+                font.pixelSize: 14
+            }
+        }
+    }
+
     ColumnLayout {
         id: mainCol
         anchors.fill: parent
@@ -261,6 +391,37 @@ ApplicationWindow {
                 text: lastSim.ok ? "<span style='color:#9af'>OK</span>" : "<span style='color:#f88'>Risk</span>"
                 textFormat: Text.RichText
                 font.pixelSize: 13
+            }
+            Item {
+                id: signalDykMarker
+                Layout.preferredWidth: 16
+                Layout.preferredHeight: 16
+                Layout.alignment: Qt.AlignVCenter
+                visible: win.learningMode
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: 12
+                    height: 12
+                    radius: 6
+                    color: Qt.rgba(0.12, 0.35, 0.45, 0.85)
+                    border.width: 1
+                    border.color: Qt.rgba(0.45, 1.0, 0.85, 0.45 + 0.35 * Math.sin(win.ionClock * 2.8))
+                }
+                Label {
+                    anchors.centerIn: parent
+                    text: "i"
+                    color: "#7cf5c6"
+                    font.pixelSize: 8
+                    font.bold: true
+                }
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: win.showDidYouKnow("signal")
+                    onEntered: win.armDykHover("signal")
+                    onExited: win.disarmDykHover("signal")
+                }
             }
         }
 
@@ -580,6 +741,100 @@ ApplicationWindow {
                                         font.pixelSize: 8
                                     }
 
+                                    Item {
+                                        z: 22
+                                        visible: win.learningMode && isMyelin
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
+                                        anchors.margins: 1
+                                        width: 15
+                                        height: 15
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 13
+                                            height: 13
+                                            radius: 6
+                                            color: Qt.rgba(0.06, 0.22, 0.18, 0.92)
+                                            border.width: 1
+                                            border.color: Qt.rgba(0.35, 1.0, 0.65, 0.4 + 0.35 * Math.sin(win.ionClock * 3.1))
+                                        }
+                                        Label {
+                                            anchors.centerIn: parent
+                                            text: "i"
+                                            color: "#9af7c8"
+                                            font.pixelSize: 9
+                                            font.bold: true
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: win.showDidYouKnow("myelin")
+                                            onEntered: win.armDykHover("myelin")
+                                            onExited: win.disarmDykHover("myelin")
+                                        }
+                                    }
+
+                                    Item {
+                                        z: 22
+                                        visible: win.learningMode && isRanvier
+                                        anchors.left: parent.left
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 15
+                                        height: 15
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 13
+                                            height: 13
+                                            radius: 6
+                                            color: Qt.rgba(0.25, 0.12, 0.06, 0.9)
+                                            border.width: 1
+                                            border.color: Qt.rgba(1.0, 0.65, 0.35, 0.45 + 0.35 * Math.sin(win.ionClock * 2.9))
+                                        }
+                                        Label {
+                                            anchors.centerIn: parent
+                                            text: "?"
+                                            color: "#ffb070"
+                                            font.pixelSize: 10
+                                            font.bold: true
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: win.showDidYouKnow("ranvier")
+                                            onEntered: win.armDykHover("ranvier")
+                                            onExited: win.disarmDykHover("ranvier")
+                                        }
+                                    }
+
+                                    Item {
+                                        z: 22
+                                        visible: win.learningMode && isRanvier
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
+                                        anchors.margins: 1
+                                        width: 12
+                                        height: 12
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 9
+                                            height: 9
+                                            radius: 4
+                                            color: Qt.rgba(0.55, 0.65, 1.0, 0.25 + 0.35 * Math.sin(win.ionClock * 4.2))
+                                            border.width: 1
+                                            border.color: Qt.rgba(0.75, 0.85, 1.0, 0.65)
+                                        }
+                                        MouseArea {
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            cursorShape: Qt.PointingHandCursor
+                                            onClicked: win.showDidYouKnow("pump")
+                                            onEntered: win.armDykHover("pump")
+                                            onExited: win.disarmDykHover("pump")
+                                        }
+                                    }
+
                                     MouseArea {
                                         z: 15
                                         anchors.fill: parent
@@ -629,6 +884,16 @@ ApplicationWindow {
             Button {
                 text: "Reset"
                 onClicked: win.resetLevel()
+            }
+            Button {
+                text: win.learningMode ? "Learning: ON" : "Learning: OFF"
+                font.pixelSize: 11
+                flat: true
+                onClicked: {
+                    win.learningMode = !win.learningMode;
+                    if (!win.learningMode)
+                        win.dismissDidYouKnow();
+                }
             }
             Label {
                 text: "Click interior cells to toggle myelin. Every Ranvier node (non-myelin) shows stripes, pumps, and ions. Track width scales with segment count."
