@@ -17,10 +17,78 @@ Item {
 
     property bool introStarted: false
     property real glowPulse: 0
+    property int brainFrameCount: 24
+    property int brainFrameIntervalMs: 980
+    property int brainFrame: 0
+    property string brainSpriteSource: ""
+    property var brainSpriteSources: []
+    property var brainSpriteLoadedFlags: ({})
+    property int brainSpriteLoadedCount: 0
+    property bool brainSpriteReady: false
+
+    function padFrame(v) {
+        var n = Math.max(0, Math.floor(v));
+        if (n < 10)
+            return "00" + n;
+        if (n < 100)
+            return "0" + n;
+        return "" + n;
+    }
+
+    function resolveBrainSpriteSource(frameIndex) {
+        return Qt.resolvedUrl("../assets/renders/human-brain/human-brain_" + padFrame(frameIndex) + ".png");
+    }
+
+    function rebuildBrainSources() {
+        var arr = [];
+        for (var i = 0; i < brainFrameCount; i++)
+            arr.push(resolveBrainSpriteSource(i));
+        brainSpriteSources = arr;
+    }
+
+    function updateBrainSpriteSource() {
+        if (brainSpriteSources.length < brainFrameCount)
+            rebuildBrainSources();
+        if (brainSpriteSources.length < 1)
+            return;
+        var idx = brainFrame % brainFrameCount;
+        if (idx < 0)
+            idx += brainFrameCount;
+        brainSpriteSource = brainSpriteSources[idx];
+    }
+
+    function resetBrainSprites() {
+        brainFrame = 0;
+        brainSpriteSource = "";
+        brainSpriteReady = false;
+        brainSpriteLoadedCount = 0;
+        brainSpriteLoadedFlags = ({});
+        rebuildBrainSources();
+    }
+
+    function onBrainSpritePreload(index, status) {
+        if (status !== Image.Ready && status !== Image.Error)
+            return;
+        if (index < 0 || index >= brainFrameCount)
+            return;
+        if (brainSpriteLoadedFlags[index])
+            return;
+        var nextFlags = {};
+        for (var key in brainSpriteLoadedFlags)
+            nextFlags[key] = brainSpriteLoadedFlags[key];
+        nextFlags[index] = true;
+        brainSpriteLoadedFlags = nextFlags;
+        brainSpriteLoadedCount += 1;
+        if (brainSpriteLoadedCount >= brainFrameCount) {
+            brainSpriteReady = true;
+            updateBrainSpriteSource();
+        }
+    }
 
     function triggerIntro() {
         introStarted = false;
         introKick.restart();
+        resetBrainSprites();
     }
 
     Component.onCompleted: {
@@ -43,6 +111,19 @@ Item {
         onTriggered: root.introStarted = true
     }
 
+    Timer {
+        id: brainSpinTimer
+        interval: root.brainFrameIntervalMs
+        repeat: true
+        running: root.visible
+        onTriggered: {
+            if (!root.brainSpriteReady || root.brainFrameCount < 1)
+                return;
+            root.brainFrame = (root.brainFrame + 1) % root.brainFrameCount;
+            root.updateBrainSpriteSource();
+        }
+    }
+
     NumberAnimation on glowPulse {
         from: 0
         to: 1
@@ -55,7 +136,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: "#060a17"
-        opacity: 0.98
+        opacity: 1.0
     }
 
     Repeater {
@@ -136,73 +217,48 @@ Item {
                 border.color: Qt.rgba(0.5, 0.84, 1.0, 0.12 + 0.08 * root.glowPulse)
             }
 
-            Loader {
-                id: ending3dLoader
-                anchors.fill: parent
-                active: root.supportsStory3d
-                source: "StoryVisual3D.qml"
-            }
-
-            Binding {
-                target: ending3dLoader.item
-                property: "modelSource"
-                value: root.brainModelSource
-                when: ending3dLoader.status === Loader.Ready
-            }
-            Binding {
-                target: ending3dLoader.item
-                property: "modelScale"
-                value: 34
-                when: ending3dLoader.status === Loader.Ready
-            }
-            Binding {
-                target: ending3dLoader.item
-                property: "modelRotX"
-                value: -12
-                when: ending3dLoader.status === Loader.Ready
-            }
-            Binding {
-                target: ending3dLoader.item
-                property: "modelRotY"
-                value: 18
-                when: ending3dLoader.status === Loader.Ready
-            }
-            Binding {
-                target: ending3dLoader.item
-                property: "modelRotZ"
-                value: 0
-                when: ending3dLoader.status === Loader.Ready
-            }
-            Binding {
-                target: ending3dLoader.item
-                property: "modelPosY"
-                value: -22
-                when: ending3dLoader.status === Loader.Ready
-            }
-            Binding {
-                target: ending3dLoader.item
-                property: "camY"
-                value: 20
-                when: ending3dLoader.status === Loader.Ready
-            }
-            Binding {
-                target: ending3dLoader.item
-                property: "camZ"
-                value: 150
-                when: ending3dLoader.status === Loader.Ready
-            }
-            Binding {
-                target: ending3dLoader.item
-                property: "spinClock"
-                value: root.brainSpinClock
-                when: ending3dLoader.status === Loader.Ready
+            Image {
+                id: brainSpriteImage
+                anchors.centerIn: parent
+                width: parent.width * 0.64
+                height: parent.height * 0.92
+                source: root.brainSpriteSource
+                fillMode: Image.PreserveAspectFit
+                smooth: true
+                asynchronous: false
+                cache: true
+                visible: root.brainSpriteReady && source !== ""
             }
 
             Item {
                 anchors.fill: parent
-                visible: !root.supportsStory3d
-                         || ending3dLoader.status !== Loader.Ready
-                         || !ending3dLoader.item.modelReady
+                opacity: 0.0
+                Repeater {
+                    model: root.brainSpriteSources.length
+                    Image {
+                        width: 1
+                        height: 1
+                        source: root.brainSpriteSources[index]
+                        asynchronous: true
+                        cache: true
+                        onStatusChanged: root.onBrainSpritePreload(index, status)
+                    }
+                }
+            }
+
+            Label {
+                anchors.horizontalCenter: parent.horizontalCenter
+                anchors.verticalCenter: parent.verticalCenter
+                visible: !root.brainSpriteReady
+                text: "Loading brain visual..."
+                color: "#a8c7e8"
+                font.pixelSize: 12
+            }
+
+            Item {
+                anchors.fill: parent
+                visible: root.brainSpriteReady
+                         && (brainSpriteImage.source === "" || brainSpriteImage.status === Image.Error)
 
                 Rectangle {
                     anchors.centerIn: parent
@@ -237,83 +293,91 @@ Item {
             border.color: Qt.rgba(0.45, 0.7, 1.0, 0.26)
             clip: true
 
-            ColumnLayout {
-                anchors.fill: parent
-                anchors.margins: 12
-                spacing: 6
+            Label {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.leftMargin: 12
+                anchors.topMargin: 10
+                text: "Level Results"
+                color: "#9fd9ff"
+                font.pixelSize: 14
+                font.bold: true
+            }
 
-                Label {
-                    text: "Level Results"
-                    color: "#9fd9ff"
-                    font.pixelSize: 14
-                    font.bold: true
-                }
+            ListView {
+                id: resultsList
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
+                anchors.topMargin: 34
+                anchors.bottomMargin: 10
+                model: root.levelResultsModel
+                interactive: false
+                clip: true
+                spacing: 3
 
-                Repeater {
-                    model: root.levelResultsModel
-                    delegate: RowLayout {
-                        id: summaryRow
-                        Layout.fillWidth: true
+                delegate: Item {
+                    width: resultsList.width
+                    height: 24
+                    property bool shown: false
+                    opacity: shown ? 1 : 0
+                    x: shown ? 0 : -10
+
+                    Behavior on opacity { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+                    Behavior on x { NumberAnimation { duration: 220; easing.type: Easing.OutCubic } }
+
+                    Timer {
+                        interval: index * 85
+                        running: root.introStarted && !parent.shown
+                        repeat: false
+                        onTriggered: {
+                            parent.shown = true;
+                        }
+                    }
+
+                    Row {
+                        anchors.fill: parent
                         spacing: 10
-                        opacity: 0
-                        y: 8
-
-                        states: State {
-                            name: "shown"
-                            when: root.introStarted
-                            PropertyChanges {
-                                target: summaryRow
-                                opacity: 1
-                                y: 0
-                            }
-                        }
-
-                        transitions: Transition {
-                            from: ""
-                            to: "shown"
-                            SequentialAnimation {
-                                PauseAnimation { duration: index * 85 }
-                                ParallelAnimation {
-                                    NumberAnimation { target: summaryRow; property: "opacity"; duration: 240; easing.type: Easing.OutCubic }
-                                    NumberAnimation { target: summaryRow; property: "y"; duration: 240; easing.type: Easing.OutCubic }
-                                }
-                            }
-                        }
 
                         Label {
+                            width: 28
                             text: modelData.emoji
                             color: "#d8eaff"
                             font.pixelSize: 16
-                            Layout.preferredWidth: 28
+                            verticalAlignment: Text.AlignVCenter
                         }
-
                         Label {
+                            width: Math.max(120, resultsList.width - 292)
                             text: modelData.title
                             color: "#e3edf8"
                             font.pixelSize: 13
-                            Layout.fillWidth: true
+                            verticalAlignment: Text.AlignVCenter
+                            elide: Text.ElideRight
                         }
-
                         Label {
+                            width: 20
                             text: modelData.success ? "\u2713" : "-"
                             color: modelData.success ? "#7bf5ce" : "#ffb394"
                             font.pixelSize: 15
                             font.bold: true
-                            Layout.preferredWidth: 20
+                            verticalAlignment: Text.AlignVCenter
                         }
-
                         Label {
+                            width: 120
                             text: "Strength: " + modelData.strength
                             color: "#b8cce2"
                             font.pixelSize: 12
-                            Layout.preferredWidth: 120
+                            verticalAlignment: Text.AlignVCenter
                         }
-
                         Label {
+                            width: 72
                             text: "ATP: " + modelData.atp
                             color: "#b8cce2"
                             font.pixelSize: 12
-                            Layout.preferredWidth: 72
+                            verticalAlignment: Text.AlignVCenter
                         }
                     }
                 }

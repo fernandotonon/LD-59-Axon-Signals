@@ -259,10 +259,13 @@ ApplicationWindow {
     Loader {
         id: audioLoader
         active: true
-        source: "AudioController.qml"
+        source: "AudioControllerClay.qml"
         onStatusChanged: {
-            if (status === Loader.Ready)
+            if (status === Loader.Ready) {
                 win.updateMusicState();
+            } else if (status === Loader.Error && source === "AudioControllerClay.qml") {
+                source = "AudioController.qml";
+            }
         }
     }
 
