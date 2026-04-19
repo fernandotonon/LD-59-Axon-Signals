@@ -1,5 +1,6 @@
 import QtQuick 2.15
 import QtQuick3D 1.15
+import QtQuick3D.AssetUtils
 
 Item {
     id: root
@@ -12,6 +13,8 @@ Item {
     property real camY: 24
     property real camZ: 170
     property real spinClock: 0
+    readonly property bool modelReady: modelNode.status === RuntimeLoader.Success
+    readonly property string modelError: modelNode.errorString
 
     View3D {
         anchors.fill: parent
@@ -50,17 +53,17 @@ Item {
             color: "#ffb775"
         }
 
-        Node {
+        RuntimeLoader {
+            id: modelNode
+            source: root.modelSource
             y: root.modelPosY
-
-            Model {
-                source: root.modelSource
-                scale: Qt.vector3d(root.modelScale, root.modelScale, root.modelScale)
-                eulerRotation.x: root.modelRotX
-                eulerRotation.y: root.modelRotY + root.spinClock * 10
-                eulerRotation.z: root.modelRotZ
-                castsShadows: true
-                receivesShadows: true
+            scale: Qt.vector3d(root.modelScale, root.modelScale, root.modelScale)
+            eulerRotation.x: root.modelRotX
+            eulerRotation.y: root.modelRotY + root.spinClock * 10
+            eulerRotation.z: root.modelRotZ
+            onStatusChanged: {
+                if (status === RuntimeLoader.Error)
+                    console.log("StoryVisual3D RuntimeLoader error:", errorString, "source:", source)
             }
         }
     }

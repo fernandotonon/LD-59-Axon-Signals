@@ -866,7 +866,9 @@ ApplicationWindow {
                         id: storyFallbackLayer
                         anchors.fill: parent
                         anchors.margins: 8
-                        visible: !win.supportsStory3d() || story3dLoader.status !== Loader.Ready
+                        visible: !win.supportsStory3d()
+                                 || story3dLoader.status !== Loader.Ready
+                                 || !story3dLoader.item.modelReady
 
                         Image {
                             id: storyTurntableFrame
