@@ -18,10 +18,19 @@ Item {
     property bool introStarted: false
     property real glowPulse: 0
 
+    function triggerIntro() {
+        introStarted = false;
+        introKick.restart();
+    }
+
+    Component.onCompleted: {
+        if (visible)
+            triggerIntro();
+    }
+
     onVisibleChanged: {
         if (visible) {
-            introStarted = false;
-            introKick.restart();
+            triggerIntro();
         } else {
             introStarted = false;
         }
@@ -46,13 +55,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         color: "#060a17"
-        opacity: root.introStarted ? 1.0 : 0.0
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 420
-                easing.type: Easing.OutCubic
-            }
-        }
+        opacity: 0.98
     }
 
     Repeater {
@@ -345,6 +348,7 @@ Item {
 
                         Column {
                             anchors.centerIn: parent
+                            width: parent.width - 10
                             spacing: 2
                             Label {
                                 text: modelData.emoji
