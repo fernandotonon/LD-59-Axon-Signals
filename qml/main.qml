@@ -681,14 +681,19 @@ ApplicationWindow {
             border.width: 1
             border.color: Qt.rgba(0.45, 0.62, 0.95, 0.24)
 
-            RowLayout {
+            Item {
+                id: headerBand
                 anchors.fill: parent
                 anchors.margins: 12
-                spacing: 12
+                readonly property int leftW: 210
+                readonly property int rightW: Math.min(330, Math.max(280, width * 0.3))
 
                 Rectangle {
-                    Layout.preferredWidth: 210
-                    Layout.fillHeight: true
+                    id: storyVisualCard
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: headerBand.leftW
                     radius: 12
                     color: Qt.rgba(0.08, 0.13, 0.25, 0.95)
                     border.width: 1
@@ -727,24 +732,30 @@ ApplicationWindow {
                 }
 
                 Rectangle {
-                    Layout.fillWidth: true
-                    Layout.fillHeight: true
+                    id: levelStoryCard
+                    anchors.left: storyVisualCard.right
+                    anchors.right: infoPanelsCol.left
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    anchors.leftMargin: 12
+                    anchors.rightMargin: 12
                     radius: 12
                     color: Qt.rgba(0.08, 0.12, 0.2, 0.9)
                     border.width: 1
                     border.color: Qt.rgba(0.55, 0.72, 1.0, 0.2)
+                    clip: true
 
                     Column {
                         anchors.fill: parent
                         anchors.margins: 14
-                        spacing: 8
+                        spacing: 6
 
                         Label {
                             width: parent.width
                             text: "Level " + (currentLevelIndex + 1) + " / " + Levels.levelCount()
                                     + " - " + Levels.getLevel(currentLevelIndex).title
                             color: "#9fd9ff"
-                            font.pixelSize: 16
+                            font.pixelSize: 15
                             font.bold: true
                             wrapMode: Text.WordWrap
                         }
@@ -753,7 +764,7 @@ ApplicationWindow {
                             width: parent.width
                             text: Levels.getLevel(currentLevelIndex).scenarioText
                             color: "#e6eef9"
-                            font.pixelSize: 17
+                            font.pixelSize: 15
                             wrapMode: Text.WordWrap
                         }
 
@@ -790,18 +801,22 @@ ApplicationWindow {
                     }
                 }
 
-                ColumnLayout {
-                    Layout.preferredWidth: 326
-                    Layout.fillHeight: true
+                Column {
+                    id: infoPanelsCol
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.bottom: parent.bottom
+                    width: headerBand.rightW
                     spacing: 10
 
                     Rectangle {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
+                        width: parent.width
+                        height: (parent.height - parent.spacing) / 2
                         radius: 12
                         color: Qt.rgba(0.08, 0.12, 0.2, 0.9)
                         border.width: 1
                         border.color: Qt.rgba(0.43, 0.8, 1.0, 0.22)
+                        clip: true
                         Column {
                             anchors.fill: parent
                             anchors.margins: 10
@@ -825,12 +840,13 @@ ApplicationWindow {
                     }
 
                     Rectangle {
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
+                        width: parent.width
+                        height: (parent.height - parent.spacing) / 2
                         radius: 12
                         color: Qt.rgba(0.1, 0.11, 0.19, 0.9)
                         border.width: 1
                         border.color: Qt.rgba(0.7, 0.68, 1.0, 0.22)
+                        clip: true
                         Column {
                             anchors.fill: parent
                             anchors.margins: 10
@@ -1305,108 +1321,6 @@ ApplicationWindow {
                     }
                 }
 
-                Item {
-                    anchors.left: parent.left
-                    anchors.leftMargin: 88
-                    anchors.top: parent.top
-                    width: 178
-                    height: 52
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 10
-                        color: Qt.rgba(0.1, 0.22, 0.2, 0.84)
-                        border.width: 1
-                        border.color: Qt.rgba(0.53, 0.96, 0.82, 0.28)
-                    }
-                    Label {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 9
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Myelin"
-                        color: "#a8ffe1"
-                        font.pixelSize: 11
-                        font.bold: true
-                    }
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 86
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 80
-                        height: 2
-                        radius: 1
-                        color: Qt.rgba(0.56, 0.96, 0.82, 0.5)
-                        rotation: 22
-                    }
-                }
-
-                Item {
-                    anchors.right: parent.right
-                    anchors.rightMargin: 88
-                    anchors.top: parent.top
-                    width: 204
-                    height: 52
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 10
-                        color: Qt.rgba(0.24, 0.15, 0.11, 0.86)
-                        border.width: 1
-                        border.color: Qt.rgba(1.0, 0.66, 0.42, 0.28)
-                    }
-                    Label {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 9
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Node of Ranvier"
-                        color: "#ffc99a"
-                        font.pixelSize: 11
-                        font.bold: true
-                    }
-                    Rectangle {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 12
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 70
-                        height: 2
-                        radius: 1
-                        color: Qt.rgba(1.0, 0.68, 0.43, 0.5)
-                        rotation: -18
-                    }
-                }
-
-                Item {
-                    anchors.right: parent.right
-                    anchors.rightMargin: 116
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 10
-                    width: 170
-                    height: 44
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 9
-                        color: Qt.rgba(0.21, 0.17, 0.3, 0.86)
-                        border.width: 1
-                        border.color: Qt.rgba(0.82, 0.72, 1.0, 0.26)
-                    }
-                    Label {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 9
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Na+/K+ Pump"
-                        color: "#dfc6ff"
-                        font.pixelSize: 11
-                        font.bold: true
-                    }
-                    Rectangle {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 108
-                        anchors.verticalCenter: parent.verticalCenter
-                        width: 56
-                        height: 2
-                        radius: 1
-                        color: Qt.rgba(0.82, 0.72, 1.0, 0.5)
-                        rotation: 14
-                    }
-                }
             }
         }
 
