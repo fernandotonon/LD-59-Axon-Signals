@@ -228,8 +228,7 @@ ApplicationWindow {
     }
 
     function supportsStory3d() {
-        var os = "" + Qt.platform.os;
-        return os !== "wasm" && os !== "webassembly";
+        return true;
     }
 
     function listToBullets(lines) {
