@@ -1,0 +1,67 @@
+import QtQuick 2.15
+import QtQuick3D 1.15
+
+Item {
+    id: root
+    property string modelSource: ""
+    property real modelScale: 24
+    property real modelRotX: -10
+    property real modelRotY: 0
+    property real modelRotZ: 0
+    property real modelPosY: -18
+    property real camY: 24
+    property real camZ: 170
+    property real spinClock: 0
+
+    View3D {
+        anchors.fill: parent
+        renderMode: View3D.Offscreen
+        environment: SceneEnvironment {
+            clearColor: "#0d152b"
+            backgroundMode: SceneEnvironment.Color
+            antialiasingMode: SceneEnvironment.MSAA
+            antialiasingQuality: SceneEnvironment.High
+        }
+        camera: storyCam
+
+        PerspectiveCamera {
+            id: storyCam
+            position: Qt.vector3d(0, root.camY, root.camZ)
+            eulerRotation.x: -8
+        }
+
+        DirectionalLight {
+            eulerRotation.x: -35
+            eulerRotation.y: -25
+            brightness: 1.35
+        }
+
+        PointLight {
+            position: Qt.vector3d(42, 38, 78)
+            brightness: 120
+            quadraticFade: 0.08
+            color: "#82c6ff"
+        }
+
+        PointLight {
+            position: Qt.vector3d(-48, -24, 52)
+            brightness: 65
+            quadraticFade: 0.11
+            color: "#ffb775"
+        }
+
+        Node {
+            y: root.modelPosY
+
+            Model {
+                source: root.modelSource
+                scale: Qt.vector3d(root.modelScale, root.modelScale, root.modelScale)
+                eulerRotation.x: root.modelRotX
+                eulerRotation.y: root.modelRotY + root.spinClock * 10
+                eulerRotation.z: root.modelRotZ
+                castsShadows: true
+                receivesShadows: true
+            }
+        }
+    }
+}

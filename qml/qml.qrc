@@ -1,6 +1,7 @@
 <RCC>
     <qresource prefix="/">
         <file alias="qml/main.qml">main.qml</file>
+        <file alias="qml/StoryVisual3D.qml">StoryVisual3D.qml</file>
         <file alias="qml/js/signalSim.js">js/signalSim.js</file>
         <file alias="qml/js/levels.js">js/levels.js</file>
         <file alias="assets/ice_cream_truck.glb">../assets/ice_cream_truck.glb</file>

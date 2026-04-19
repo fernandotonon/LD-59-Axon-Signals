@@ -3,7 +3,6 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import QtQuick3D 1.15
 import "js/signalSim.js" as SignalSim
 import "js/levels.js" as Levels
 
@@ -18,7 +17,17 @@ ApplicationWindow {
     property int segmentCount: 26
     property int cellOuterWidth: 52
     property int axonSpacing: 10
-    readonly property int axonRowHeight: 236
+    readonly property bool compactUi: win.height < 980 || win.width < 1380
+    readonly property bool veryCompactUi: win.height < 930 || win.width < 1220
+    readonly property int uiGap: compactUi ? 8 : 12
+    readonly property int axonRowHeight: veryCompactUi ? 176 : (compactUi ? 198 : 236)
+    readonly property int hudBarHeight: compactUi ? 54 : 62
+    readonly property int hudCardWidth: compactUi ? 118 : 132
+    readonly property int hudCardHeight: compactUi ? 54 : 62
+    readonly property int headerBandHeight: veryCompactUi ? 222 : (compactUi ? 260 : 318)
+    readonly property int gameplayMinHeight: axonRowHeight + (compactUi ? 98 : 170)
+    readonly property int lowerBandHeight: veryCompactUi ? 174 : (compactUi ? 198 : 246)
+    readonly property int actionBarHeight: compactUi ? 58 : 70
     readonly property int axonTrackWidth: segmentCount * cellOuterWidth + (segmentCount - 1) * axonSpacing + 24
     // Dense [0..n-1] for Repeater; assigned in syncAxonIndices (not a readonly recompute) so Web/Qt builds
     // do not collapse delegates or mis-bind modelData.
@@ -216,6 +225,11 @@ ApplicationWindow {
         if (base.indexOf("qrc:/") === 0)
             return "qrc:/assets/" + filename;
         return "../assets/" + filename;
+    }
+
+    function supportsStory3d() {
+        var os = "" + Qt.platform.os;
+        return os !== "wasm" && os !== "webassembly";
     }
 
     function listToBullets(lines) {
@@ -596,11 +610,11 @@ ApplicationWindow {
         id: mainCol
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        anchors.topMargin: 12
-        anchors.bottomMargin: 12
+        anchors.topMargin: compactUi ? 8 : 12
+        anchors.bottomMargin: compactUi ? 8 : 12
         anchors.horizontalCenter: parent.horizontalCenter
         width: Math.min(parent.width - 18, 1560)
-        spacing: 12
+        spacing: uiGap
 
         RowLayout {
             Layout.fillWidth: true
@@ -611,7 +625,7 @@ ApplicationWindow {
                 color: Qt.rgba(0.05, 0.1, 0.2, 0.84)
                 border.width: 1
                 border.color: Qt.rgba(0.45, 0.67, 1.0, 0.2)
-                Layout.preferredHeight: 62
+                Layout.preferredHeight: hudBarHeight
                 Layout.fillWidth: true
 
                 RowLayout {
@@ -622,14 +636,14 @@ ApplicationWindow {
                     Label {
                         text: "Axon Signals"
                         color: "#ecf5ff"
-                        font.pixelSize: 24
+                        font.pixelSize: compactUi ? 20 : 24
                         font.bold: true
                     }
 
                     Button {
                         text: "Neuron rules"
                         flat: true
-                        font.pixelSize: 12
+                        font.pixelSize: compactUi ? 11 : 12
                         onClicked: howDrawer.open()
                         contentItem: Label {
                             text: parent.text
@@ -653,8 +667,8 @@ ApplicationWindow {
                     ]
                     delegate: Rectangle {
                         readonly property var toneCfg: win.hudCardConfig[modelData.tone]
-                        Layout.preferredWidth: 132
-                        Layout.preferredHeight: 62
+                        Layout.preferredWidth: hudCardWidth
+                        Layout.preferredHeight: hudCardHeight
                         radius: 11
                         color: Qt.rgba(0.07, 0.11, 0.2, 0.9)
                         border.width: 1
@@ -680,7 +694,7 @@ ApplicationWindow {
                             Label {
                                 text: modelData.label
                                 color: "#9caec4"
-                                font.pixelSize: 10
+                                font.pixelSize: compactUi ? 9 : 10
                             }
                             Label {
                                 text: {
@@ -692,7 +706,7 @@ ApplicationWindow {
                                             ? Math.round(win.lastSim.config.brainActivationThreshold) : 40);
                                 }
                                 color: toneCfg.colorB
-                                font.pixelSize: 18
+                                font.pixelSize: compactUi ? 15 : 18
                                 font.bold: true
                             }
                         }
@@ -704,7 +718,7 @@ ApplicationWindow {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 318
+            Layout.preferredHeight: headerBandHeight
             radius: 16
             color: Qt.rgba(0.05, 0.09, 0.18, 0.86)
             border.width: 1
@@ -714,8 +728,10 @@ ApplicationWindow {
                 id: headerBand
                 anchors.fill: parent
                 anchors.margins: 12
-                readonly property int leftW: 210
-                readonly property int rightW: Math.min(330, Math.max(280, width * 0.3))
+                readonly property int leftW: compactUi ? 170 : 210
+                readonly property int rightW: compactUi
+                                              ? Math.min(286, Math.max(238, width * 0.29))
+                                              : Math.min(330, Math.max(280, width * 0.3))
 
                 Rectangle {
                     id: storyVisualCard
@@ -740,61 +756,75 @@ ApplicationWindow {
                         border.color: Qt.rgba(0.66, 0.83, 1.0, 0.24)
                     }
 
-                    View3D {
-                        id: storyView3d
+                    Loader {
+                        id: story3dLoader
                         anchors.fill: parent
                         anchors.margins: 8
-                        renderMode: View3D.Offscreen
-                        environment: SceneEnvironment {
-                            clearColor: "#0d152b"
-                            backgroundMode: SceneEnvironment.Color
-                            antialiasingMode: SceneEnvironment.MSAA
-                            antialiasingQuality: SceneEnvironment.High
-                        }
-                        camera: storyCam
+                        active: win.supportsStory3d()
+                        source: "StoryVisual3D.qml"
+                    }
 
-                        PerspectiveCamera {
-                            id: storyCam
-                            readonly property var m: win.currentStory3dMeta()
-                            position: Qt.vector3d(0, m.camY, m.camZ)
-                            eulerRotation.x: -8
-                        }
+                    Binding {
+                        target: story3dLoader.item
+                        property: "modelSource"
+                        value: win.resolveStoryAssetSource(win.currentStory3dMeta().file)
+                        when: story3dLoader.status === Loader.Ready
+                    }
+                    Binding {
+                        target: story3dLoader.item
+                        property: "modelScale"
+                        value: win.currentStory3dMeta().scale
+                        when: story3dLoader.status === Loader.Ready
+                    }
+                    Binding {
+                        target: story3dLoader.item
+                        property: "modelRotX"
+                        value: win.currentStory3dMeta().rotX
+                        when: story3dLoader.status === Loader.Ready
+                    }
+                    Binding {
+                        target: story3dLoader.item
+                        property: "modelRotY"
+                        value: win.currentStory3dMeta().rotY
+                        when: story3dLoader.status === Loader.Ready
+                    }
+                    Binding {
+                        target: story3dLoader.item
+                        property: "modelRotZ"
+                        value: win.currentStory3dMeta().rotZ
+                        when: story3dLoader.status === Loader.Ready
+                    }
+                    Binding {
+                        target: story3dLoader.item
+                        property: "modelPosY"
+                        value: win.currentStory3dMeta().posY
+                        when: story3dLoader.status === Loader.Ready
+                    }
+                    Binding {
+                        target: story3dLoader.item
+                        property: "camY"
+                        value: win.currentStory3dMeta().camY
+                        when: story3dLoader.status === Loader.Ready
+                    }
+                    Binding {
+                        target: story3dLoader.item
+                        property: "camZ"
+                        value: win.currentStory3dMeta().camZ
+                        when: story3dLoader.status === Loader.Ready
+                    }
+                    Binding {
+                        target: story3dLoader.item
+                        property: "spinClock"
+                        value: win.ionClock
+                        when: story3dLoader.status === Loader.Ready
+                    }
 
-                        DirectionalLight {
-                            eulerRotation.x: -35
-                            eulerRotation.y: -25
-                            brightness: 1.35
-                        }
-
-                        PointLight {
-                            position: Qt.vector3d(42, 38, 78)
-                            brightness: 120
-                            quadraticFade: 0.08
-                            color: "#82c6ff"
-                        }
-
-                        PointLight {
-                            position: Qt.vector3d(-48, -24, 52)
-                            brightness: 65
-                            quadraticFade: 0.11
-                            color: "#ffb775"
-                        }
-
-                        Node {
-                            readonly property var m: win.currentStory3dMeta()
-                            y: m.posY
-
-                            Model {
-                                id: storyModel
-                                source: win.resolveStoryAssetSource(m.file)
-                                scale: Qt.vector3d(m.scale, m.scale, m.scale)
-                                eulerRotation.x: m.rotX
-                                eulerRotation.y: m.rotY + win.ionClock * 10
-                                eulerRotation.z: m.rotZ
-                                castsShadows: true
-                                receivesShadows: true
-                            }
-                        }
+                    Label {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.verticalCenter: parent.verticalCenter
+                        visible: !win.supportsStory3d() || story3dLoader.status !== Loader.Ready
+                        text: Levels.getLevel(currentLevelIndex).scenarioEmoji || "?"
+                        font.pixelSize: compactUi ? 52 : 64
                     }
 
                     Rectangle {
@@ -813,7 +843,7 @@ ApplicationWindow {
                         anchors.margins: 10
                         text: missionMeta().visualLabel
                         color: "#d9ebff"
-                        font.pixelSize: 11
+                        font.pixelSize: compactUi ? 10 : 11
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
                     }
@@ -843,7 +873,7 @@ ApplicationWindow {
                             text: "Level " + (currentLevelIndex + 1) + " / " + Levels.levelCount()
                                     + " - " + Levels.getLevel(currentLevelIndex).title
                             color: "#9fd9ff"
-                            font.pixelSize: 15
+                            font.pixelSize: compactUi ? 13 : 15
                             font.bold: true
                             wrapMode: Text.WordWrap
                         }
@@ -852,7 +882,7 @@ ApplicationWindow {
                             width: parent.width
                             text: Levels.getLevel(currentLevelIndex).scenarioText
                             color: "#e6eef9"
-                            font.pixelSize: 15
+                            font.pixelSize: compactUi ? 13 : 15
                             wrapMode: Text.WordWrap
                         }
 
@@ -873,13 +903,14 @@ ApplicationWindow {
                                 anchors.rightMargin: 10
                                 text: missionMeta().urgency
                                 color: "#ffc99a"
-                                font.pixelSize: 12
+                                font.pixelSize: compactUi ? 11 : 12
                                 font.bold: true
                                 wrapMode: Text.WordWrap
                             }
                         }
 
                         Label {
+                            visible: !compactUi
                             width: parent.width
                             text: "Consequence: " + missionMeta().consequence
                             color: "#9eaac0"
@@ -913,14 +944,14 @@ ApplicationWindow {
                                 width: parent.width
                                 text: "How it works"
                                 color: "#8fe3ff"
-                                font.pixelSize: 12
+                                font.pixelSize: compactUi ? 11 : 12
                                 font.bold: true
                             }
                             Label {
                                 width: parent.width
                                 text: win.listToBullets(win.howItWorksLines)
                                 color: "#c2d2e8"
-                                font.pixelSize: 10
+                                font.pixelSize: compactUi ? 9 : 10
                                 wrapMode: Text.WordWrap
                                 lineHeight: 1.15
                             }
@@ -943,14 +974,14 @@ ApplicationWindow {
                                 width: parent.width
                                 text: "Did you know?"
                                 color: "#c8b7ff"
-                                font.pixelSize: 12
+                                font.pixelSize: compactUi ? 11 : 12
                                 font.bold: true
                             }
                             Label {
                                 width: parent.width
                                 text: win.listToBullets(win.didYouKnowLines)
                                 color: "#c6cce0"
-                                font.pixelSize: 10
+                                font.pixelSize: compactUi ? 9 : 10
                                 wrapMode: Text.WordWrap
                                 lineHeight: 1.15
                             }
@@ -963,7 +994,7 @@ ApplicationWindow {
         Rectangle {
             Layout.fillWidth: true
             Layout.fillHeight: true
-            Layout.minimumHeight: win.axonRowHeight + 170
+            Layout.minimumHeight: gameplayMinHeight
             radius: 18
             color: Qt.rgba(0.04, 0.09, 0.16, 0.86)
             border.width: 1
@@ -1414,12 +1445,12 @@ ApplicationWindow {
 
         RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 246
+            Layout.preferredHeight: lowerBandHeight
             spacing: 10
 
             Rectangle {
                 Layout.fillHeight: true
-                Layout.preferredWidth: 290
+                Layout.preferredWidth: compactUi ? 250 : 290
                 radius: 14
                 color: Qt.rgba(0.08, 0.11, 0.18, 0.88)
                 border.width: 1
@@ -1433,24 +1464,25 @@ ApplicationWindow {
                         width: parent.width
                         text: "Mission Snapshot"
                         color: "#9fd6ff"
-                        font.pixelSize: 12
+                        font.pixelSize: compactUi ? 11 : 12
                         font.bold: true
                     }
                     Label {
                         width: parent.width
                         text: Levels.getLevel(currentLevelIndex).scenarioText
                         color: "#d9e7f8"
-                        font.pixelSize: 12
+                        font.pixelSize: compactUi ? 10 : 12
                         wrapMode: Text.WordWrap
                     }
                     Label {
                         width: parent.width
                         text: missionMeta().urgency
                         color: "#ffc28f"
-                        font.pixelSize: 11
+                        font.pixelSize: compactUi ? 10 : 11
                         wrapMode: Text.WordWrap
                     }
                     Label {
+                        visible: !compactUi
                         width: parent.width
                         text: "If you fail: " + missionMeta().consequence
                         color: "#9faec3"
@@ -1475,7 +1507,7 @@ ApplicationWindow {
                     Label {
                         text: "Paths - tap one to select"
                         color: "#a7d5ff"
-                        font.pixelSize: 12
+                        font.pixelSize: compactUi ? 11 : 12
                         font.bold: true
                     }
                     Repeater {
@@ -1484,7 +1516,7 @@ ApplicationWindow {
                             property int pathIdx: index
                             property var pathItem: modelData
                             Layout.fillWidth: true
-                            Layout.preferredHeight: 64
+                            Layout.preferredHeight: compactUi ? 52 : 64
 
                             Rectangle {
                                 anchors.fill: parent
@@ -1510,8 +1542,8 @@ ApplicationWindow {
                                     spacing: 10
 
                                     Rectangle {
-                                        Layout.preferredWidth: 11
-                                        Layout.preferredHeight: 11
+                                        Layout.preferredWidth: compactUi ? 9 : 11
+                                        Layout.preferredHeight: compactUi ? 9 : 11
                                         radius: 5
                                         color: pathIdx === selectedPathIndex ? "#64ecff" : "#3a4555"
                                     }
@@ -1522,7 +1554,7 @@ ApplicationWindow {
                                         Label {
                                             text: pathItem.label
                                             color: "#e8eef5"
-                                            font.pixelSize: 12
+                                            font.pixelSize: compactUi ? 11 : 12
                                             font.bold: true
                                             Layout.fillWidth: true
                                             wrapMode: Text.WordWrap
@@ -1530,7 +1562,7 @@ ApplicationWindow {
                                         Label {
                                             text: pathItem.hint
                                             color: pathIdx === selectedPathIndex ? "#acd5f0" : "#7d8896"
-                                            font.pixelSize: 10
+                                            font.pixelSize: compactUi ? 9 : 10
                                             Layout.fillWidth: true
                                             wrapMode: Text.WordWrap
                                         }
@@ -1543,7 +1575,7 @@ ApplicationWindow {
                                             model: pathItem.segmentCount
                                             Rectangle {
                                                 width: 3
-                                                height: 22
+                                                height: compactUi ? 18 : 22
                                                 radius: 1
                                                 color: pathMyelinByte(pathIdx, index) ? "#3e8f76" : "#d96b37"
                                             }
@@ -1564,7 +1596,7 @@ ApplicationWindow {
 
             Rectangle {
                 Layout.fillHeight: true
-                Layout.preferredWidth: 330
+                Layout.preferredWidth: compactUi ? 286 : 330
                 radius: 14
                 color: Qt.rgba(0.08, 0.11, 0.18, 0.9)
                 border.width: 1
@@ -1589,13 +1621,13 @@ ApplicationWindow {
                         width: parent.width
                         text: "Outcome"
                         color: "#b5cbe0"
-                        font.pixelSize: 11
+                        font.pixelSize: compactUi ? 10 : 11
                     }
                     Label {
                         width: parent.width
                         text: win.resultTitleText()
                         color: win.resultAccentColor()
-                        font.pixelSize: 18
+                        font.pixelSize: compactUi ? 16 : 18
                         font.bold: true
                         wrapMode: Text.WordWrap
                     }
@@ -1603,10 +1635,11 @@ ApplicationWindow {
                         width: parent.width
                         text: win.resultBodyText()
                         color: "#d9e5f3"
-                        font.pixelSize: 12
+                        font.pixelSize: compactUi ? 11 : 12
                         wrapMode: Text.WordWrap
                     }
                     Label {
+                        visible: !veryCompactUi
                         width: parent.width
                         text: "Weakest strength " + Math.round(lastSim.lowestSignalStrength !== undefined
                                 ? lastSim.lowestSignalStrength : lastSim.signalStrength)
@@ -1616,6 +1649,7 @@ ApplicationWindow {
                         wrapMode: Text.WordWrap
                     }
                     Label {
+                        visible: !veryCompactUi
                         width: parent.width
                         text: statusLine
                         color: "#9cabbe"
@@ -1628,7 +1662,7 @@ ApplicationWindow {
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 70
+            Layout.preferredHeight: actionBarHeight
             radius: 12
             color: Qt.rgba(0.05, 0.1, 0.2, 0.9)
             border.width: 1
@@ -1664,7 +1698,7 @@ ApplicationWindow {
                     contentItem: Label {
                         text: parent.text
                         color: "#eef8ff"
-                        font.pixelSize: 13
+                        font.pixelSize: compactUi ? 12 : 13
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -1683,7 +1717,7 @@ ApplicationWindow {
                     contentItem: Label {
                         text: parent.text
                         color: "#e0efff"
-                        font.pixelSize: 12
+                        font.pixelSize: compactUi ? 11 : 12
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -1704,7 +1738,7 @@ ApplicationWindow {
                     contentItem: Label {
                         text: parent.text
                         color: "#e8fffa"
-                        font.pixelSize: 12
+                        font.pixelSize: compactUi ? 11 : 12
                         font.bold: true
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
@@ -1712,9 +1746,11 @@ ApplicationWindow {
                 }
 
                 Label {
-                    text: "Hint: tap interior segments to toggle myelin and shape the signal path."
+                    text: compactUi
+                          ? "Hint: toggle myelin, then send signal."
+                          : "Hint: tap interior segments to toggle myelin and shape the signal path."
                     color: "#8ea4be"
-                    font.pixelSize: 10
+                    font.pixelSize: compactUi ? 9 : 10
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
                 }
