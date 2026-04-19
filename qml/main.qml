@@ -701,8 +701,105 @@ ApplicationWindow {
                                         visible: isMyelin || isRanvier
                                     }
 
+                                    Item {
+                                        z: 8
+                                        visible: isRanvier
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.top: parent.top
+                                        anchors.topMargin: 10
+                                        width: 26
+                                        height: 26
+                                        Rectangle {
+                                            x: 1
+                                            y: 4
+                                            width: 9
+                                            height: 16
+                                            radius: 3
+                                            color: (nearPulse || spikeBoost > 0.2) ? "#9eb8e8" : "#556892"
+                                            border.color: "#c8daf8"
+                                            border.width: 1
+                                            transform: Rotation {
+                                                origin.x: 4.5
+                                                origin.y: 8
+                                                axis: Qt.vector3d(0, 0, 1)
+                                                angle: (nearPulse || spikeBoost > 0.15)
+                                                        ? 16 * Math.sin(win.ionClock * 2.4)
+                                                        : 3 * Math.sin(win.ionClock * 0.85)
+                                            }
+                                        }
+                                        Rectangle {
+                                            x: 14
+                                            y: 4
+                                            width: 9
+                                            height: 16
+                                            radius: 3
+                                            color: (nearPulse || spikeBoost > 0.2) ? "#b4c8f5" : "#5c6fa0"
+                                            border.color: "#e2ebff"
+                                            border.width: 1
+                                            transform: Rotation {
+                                                origin.x: 4.5
+                                                origin.y: 8
+                                                axis: Qt.vector3d(0, 0, 1)
+                                                angle: (nearPulse || spikeBoost > 0.15)
+                                                        ? -14 * Math.sin(win.ionClock * 2.1 + 0.3)
+                                                        : -2.5 * Math.sin(win.ionClock * 0.8)
+                                            }
+                                        }
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: 5
+                                            height: 5
+                                            radius: 2.5
+                                            color: "#fff6c2"
+                                            opacity: spikeBoost > 0.1 ? 0.55 + 0.4 * spikeBoost
+                                                                       : (nearPulse ? 0.38 : 0.14)
+                                        }
+                                    }
+
+                                    Item {
+                                        z: 9
+                                        visible: isRanvier
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.bottom: parent.bottom
+                                        anchors.bottomMargin: 14
+                                        width: 24
+                                        height: 22
+                                        Rectangle {
+                                            width: 4
+                                            height: 4
+                                            radius: 2
+                                            color: "#ffd54a"
+                                            x: 2 + 2 * Math.sin(win.ionClock + axonIndex)
+                                            y: 4 + (nearPulse ? 5 * Math.sin(win.ionClock * 4) : 2 * Math.sin(win.ionClock))
+                                        }
+                                        Rectangle {
+                                            width: 4
+                                            height: 4
+                                            radius: 2
+                                            color: "#ffd54a"
+                                            x: 11
+                                            y: 10 + (nearPulse ? 4 * Math.cos(win.ionClock * 3.5) : 1.5 * Math.cos(win.ionClock))
+                                        }
+                                        Rectangle {
+                                            width: 4
+                                            height: 4
+                                            radius: 2
+                                            color: "#c9a0ff"
+                                            x: 7 + 2 * Math.cos(win.ionClock * 0.9)
+                                            y: 2 + (nearPulse ? 4 * Math.sin(win.ionClock * 3.2) : 1 * Math.sin(win.ionClock))
+                                        }
+                                        Rectangle {
+                                            width: 4
+                                            height: 4
+                                            radius: 2
+                                            color: "#c9a0ff"
+                                            x: 16
+                                            y: 12 + (nearPulse ? 3 * Math.cos(win.ionClock * 4) : 1 * Math.cos(win.ionClock))
+                                        }
+                                    }
+
                                     Label {
-                                        z: 6
+                                        z: 10
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
                                         anchors.bottomMargin: 3

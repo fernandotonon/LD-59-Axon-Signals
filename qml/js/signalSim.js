@@ -79,10 +79,22 @@ function buildPlaybackTimeline(steps, n, cfg) {
         if (s.type !== "hop")
             continue;
         var i = s.index;
-        var fromF = (i + 0.06) / (n - 1);
-        var toF = (i + 0.9) / (n - 1);
-        if (i === n - 1)
-            toF = 1.0;
+        // Decay: sweep across segment i (left → right along the axon).
+        // Regen: stay at the trailing edge of that segment — the decay hop already
+        // ended at toF; reusing fromF = (i+0.06)/(n-1) would snap the pulse backward.
+        var fromF;
+        var toF;
+        if (s.phase === "regen") {
+            toF = (i + 0.9) / (n - 1);
+            if (i === n - 1)
+                toF = 1.0;
+            fromF = toF;
+        } else {
+            fromF = (i + 0.06) / (n - 1);
+            toF = (i + 0.9) / (n - 1);
+            if (i === n - 1)
+                toF = 1.0;
+        }
 
         var dur;
         if (s.phase === "regen")
