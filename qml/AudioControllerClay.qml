@@ -23,6 +23,10 @@ QtObject {
         return null;
     }
 
+    function resolveAudioSource(filename) {
+        return Qt.resolvedUrl("../assets/audio/" + filename);
+    }
+
     function playSfx(name) {
         if (!sfxEnabled)
             return;
@@ -46,39 +50,48 @@ QtObject {
 
     Sound {
         id: clickSound
-        source: "../assets/audio/click.wav"
+        source: resolveAudioSource("click.wav")
         volume: root.sfxVolume
+        onErrorOccurred: (msg) => console.log("SFX click error:", msg)
     }
 
     Sound {
         id: toggleMyelinSound
-        source: "../assets/audio/toggle_myelin.wav"
+        source: resolveAudioSource("toggle_myelin.wav")
         volume: root.sfxVolume
+        onErrorOccurred: (msg) => console.log("SFX toggle_myelin error:", msg)
     }
 
     Sound {
         id: nodeRegenSound
-        source: "../assets/audio/node_regen.wav"
+        source: resolveAudioSource("node_regen.wav")
         volume: root.sfxVolume
+        onErrorOccurred: (msg) => console.log("SFX node_regen error:", msg)
     }
 
     Sound {
         id: failSound
-        source: "../assets/audio/fail.wav"
+        source: resolveAudioSource("fail.wav")
         volume: root.sfxVolume
+        onErrorOccurred: (msg) => console.log("SFX fail error:", msg)
     }
 
     Sound {
         id: successSound
-        source: "../assets/audio/success.wav"
+        source: resolveAudioSource("success.wav")
         volume: root.sfxVolume
+        onErrorOccurred: (msg) => console.log("SFX success error:", msg)
     }
 
     Music {
         id: bgm
-        source: "../assets/audio/bgm_main.mp3"
+        source: resolveAudioSource("bgm_main.mp3")
         volume: root.musicVolume
         loop: true
+        onStatusChanged: {
+            if (bgm.status === 3)
+                console.log("BGM error: failed to load");
+        }
     }
 
     onMusicEnabledChanged: updateMusicState()

@@ -347,7 +347,8 @@ ApplicationWindow {
                 emoji: level.scenarioEmoji || "•",
                 success: found ? true : false,
                 strength: found ? found.strength : "--",
-                atp: found ? found.atp : "--"
+                atp: found ? found.atp : "--",
+                sprite0: resolveLevelSpriteFrameSource(level.id, 0)
             });
         }
         return out;
@@ -451,12 +452,27 @@ ApplicationWindow {
         return "../assets/renders/" + stem + "/" + stem + "_" + padFrameIndex(frameIndex) + ".png";
     }
 
+    function resolveLevelSpriteFrameSource(levelId, frameIndex) {
+        var meta = levelVisual3dMeta[levelId];
+        if (!meta || !meta.file)
+            return "";
+        return resolveStoryTurntableFrameSource(meta.file, frameIndex);
+    }
+
     function buildStoryTurntableSources() {
         var list = [];
         var meta = currentStory3dMeta();
         for (var i = 0; i < storyTurntableFrameCount; i++)
             list.push(resolveStoryTurntableFrameSource(meta.file, i));
         return list;
+    }
+
+    function isStoryFrameLoaded(frameIndex) {
+        if (frameIndex < 0 || frameIndex >= storyTurntableFrameCount)
+            return false;
+        if (!storyTurntableLoadedFlags.hasOwnProperty(frameIndex))
+            return false;
+        return storyTurntableLoadedFlags[frameIndex] === Image.Ready;
     }
 
     function updateStoryTurntableSource() {
@@ -467,7 +483,9 @@ ApplicationWindow {
             return;
         }
         var idx = storyTurntableFrameIndex();
-        if (idx >= 0 && idx < storyTurntableSources.length)
+        if (idx < 0 || idx >= storyTurntableSources.length)
+            return;
+        if (isStoryFrameLoaded(idx) || storyTurntableSource === "")
             storyTurntableSource = storyTurntableSources[idx];
     }
 
@@ -494,7 +512,8 @@ ApplicationWindow {
 
     function resetStoryTurntablePreload() {
         storyTurntableFrame = currentStoryFallbackStartFrame();
-        storyTurntableSource = "";
+        storyTurntableSource = resolveStoryTurntableFrameSource(
+                    currentStory3dMeta().file, storyTurntableFrameIndex());
         storyTurntableReady = false;
         storyTurntableLoadedCount = 0;
         storyTurntableLoadedFlags = ({});
@@ -506,17 +525,33 @@ ApplicationWindow {
             return;
         if (frameIndex < 0 || frameIndex >= storyTurntableFrameCount)
             return;
-        if (storyTurntableLoadedFlags[frameIndex])
+        if (storyTurntableLoadedFlags.hasOwnProperty(frameIndex))
             return;
         var nextFlags = {};
         for (var key in storyTurntableLoadedFlags)
             nextFlags[key] = storyTurntableLoadedFlags[key];
-        nextFlags[frameIndex] = true;
+        nextFlags[frameIndex] = status;
         storyTurntableLoadedFlags = nextFlags;
         storyTurntableLoadedCount += 1;
+        if (status === Image.Ready && frameIndex === storyTurntableFrameIndex())
+            updateStoryTurntableSource();
         if (storyTurntableLoadedCount >= storyTurntableFrameCount) {
             storyTurntableReady = true;
             updateStoryTurntableSource();
+        }
+    }
+
+    function tryAdvanceStoryTurntableFrame() {
+        if (storyTurntableFrameCount < 2)
+            return;
+        var base = storyTurntableFrameIndex();
+        for (var i = 1; i <= storyTurntableFrameCount; i++) {
+            var idx = (base + i) % storyTurntableFrameCount;
+            if (!isStoryFrameLoaded(idx))
+                continue;
+            storyTurntableFrame = idx;
+            updateStoryTurntableSource();
+            return;
         }
     }
 
@@ -757,10 +792,9 @@ ApplicationWindow {
         repeat: true
         running: true
         onTriggered: {
-            if (!win.storyTurntableReady || win.storyTurntableFrameCount < 1)
+            if (win.storyTurntableFrameCount < 2)
                 return;
-            win.storyTurntableFrame = (win.storyTurntableFrame + 1) % win.storyTurntableFrameCount;
-            win.updateStoryTurntableSource();
+            win.tryAdvanceStoryTurntableFrame();
         }
     }
 
@@ -1183,7 +1217,7 @@ ApplicationWindow {
                             smooth: true
                             asynchronous: false
                             cache: true
-                            visible: win.storyTurntableReady && source !== ""
+                            visible: source !== "" && status !== Image.Error
                         }
 
                         Item {
@@ -1205,7 +1239,8 @@ ApplicationWindow {
                         Label {
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.verticalCenter: parent.verticalCenter
-                            visible: !win.storyTurntableReady
+                            visible: storyTurntableImage.source !== ""
+                                     && storyTurntableImage.status !== Image.Ready
                             text: "Loading visual..."
                             color: "#a8c7e8"
                             font.pixelSize: compactUi ? 11 : 12
@@ -1214,8 +1249,8 @@ ApplicationWindow {
                         Label {
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.verticalCenter: parent.verticalCenter
-                            visible: win.storyTurntableReady
-                                     && (storyTurntableImage.source === "" || storyTurntableImage.status === Image.Error)
+                            visible: storyTurntableImage.source === ""
+                                     || storyTurntableImage.status === Image.Error
                             text: Levels.getLevel(currentLevelIndex).scenarioEmoji || "?"
                             font.pixelSize: compactUi ? 52 : 64
                         }

@@ -54,12 +54,13 @@ Item {
         var idx = brainFrame % brainFrameCount;
         if (idx < 0)
             idx += brainFrameCount;
-        brainSpriteSource = brainSpriteSources[idx];
+        if (brainSpriteLoadedFlags[idx] === Image.Ready || brainSpriteSource === "")
+            brainSpriteSource = brainSpriteSources[idx];
     }
 
     function resetBrainSprites() {
         brainFrame = 0;
-        brainSpriteSource = "";
+        brainSpriteSource = resolveBrainSpriteSource(0);
         brainSpriteReady = false;
         brainSpriteLoadedCount = 0;
         brainSpriteLoadedFlags = ({});
@@ -71,17 +72,33 @@ Item {
             return;
         if (index < 0 || index >= brainFrameCount)
             return;
-        if (brainSpriteLoadedFlags[index])
+        if (brainSpriteLoadedFlags.hasOwnProperty(index))
             return;
         var nextFlags = {};
         for (var key in brainSpriteLoadedFlags)
             nextFlags[key] = brainSpriteLoadedFlags[key];
-        nextFlags[index] = true;
+        nextFlags[index] = status;
         brainSpriteLoadedFlags = nextFlags;
         brainSpriteLoadedCount += 1;
+        if (status === Image.Ready && index === brainFrame)
+            updateBrainSpriteSource();
         if (brainSpriteLoadedCount >= brainFrameCount) {
             brainSpriteReady = true;
             updateBrainSpriteSource();
+        }
+    }
+
+    function tryAdvanceBrainFrame() {
+        if (brainFrameCount < 2)
+            return;
+        var base = brainFrame;
+        for (var i = 1; i <= brainFrameCount; i++) {
+            var idx = (base + i) % brainFrameCount;
+            if (brainSpriteLoadedFlags[idx] !== Image.Ready)
+                continue;
+            brainFrame = idx;
+            updateBrainSpriteSource();
+            return;
         }
     }
 
@@ -117,10 +134,9 @@ Item {
         repeat: true
         running: root.visible
         onTriggered: {
-            if (!root.brainSpriteReady || root.brainFrameCount < 1)
+            if (root.brainFrameCount < 2)
                 return;
-            root.brainFrame = (root.brainFrame + 1) % root.brainFrameCount;
-            root.updateBrainSpriteSource();
+            root.tryAdvanceBrainFrame();
         }
     }
 
@@ -227,7 +243,7 @@ Item {
                 smooth: true
                 asynchronous: false
                 cache: true
-                visible: root.brainSpriteReady && source !== ""
+                visible: source !== "" && status !== Image.Error
             }
 
             Item {
@@ -249,7 +265,7 @@ Item {
             Label {
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
-                visible: !root.brainSpriteReady
+                visible: brainSpriteImage.source !== "" && brainSpriteImage.status !== Image.Ready
                 text: "Loading brain visual..."
                 color: "#a8c7e8"
                 font.pixelSize: 12
@@ -257,8 +273,8 @@ Item {
 
             Item {
                 anchors.fill: parent
-                visible: root.brainSpriteReady
-                         && (brainSpriteImage.source === "" || brainSpriteImage.status === Image.Error)
+                visible: brainSpriteImage.source === ""
+                         || brainSpriteImage.status === Image.Error
 
                 Rectangle {
                     anchors.centerIn: parent
@@ -414,12 +430,28 @@ Item {
                             anchors.centerIn: parent
                             width: parent.width - 10
                             spacing: 2
-                            Label {
-                                text: modelData.emoji
-                                color: "#eaf3ff"
-                                font.pixelSize: 20
-                                horizontalAlignment: Text.AlignHCenter
+                            Item {
                                 width: parent.width
+                                height: 46
+                                Image {
+                                    id: levelThumb
+                                    anchors.centerIn: parent
+                                    width: parent.width * 0.82
+                                    height: parent.height
+                                    source: modelData.sprite0 ? modelData.sprite0 : ""
+                                    fillMode: Image.PreserveAspectFit
+                                    smooth: true
+                                    asynchronous: true
+                                    cache: true
+                                    visible: source !== "" && status !== Image.Error
+                                }
+                                Label {
+                                    anchors.centerIn: parent
+                                    text: modelData.emoji
+                                    color: "#eaf3ff"
+                                    font.pixelSize: 20
+                                    visible: !levelThumb.visible
+                                }
                             }
                             Label {
                                 text: modelData.shortTitle
