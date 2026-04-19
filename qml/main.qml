@@ -3,7 +3,6 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
-import QtQuick.Window 2.15
 import "js/signalSim.js" as SignalSim
 import "js/levels.js" as Levels
 
@@ -671,43 +670,12 @@ ApplicationWindow {
                     }
                 }
 
-                Item {
-                    id: signalDykMarker
-                    Layout.preferredWidth: 20
-                    Layout.preferredHeight: 20
-                    Layout.alignment: Qt.AlignVCenter
-                    visible: win.learningMode
-                    Rectangle {
-                        anchors.centerIn: parent
-                        width: 16
-                        height: 16
-                        radius: 8
-                        color: Qt.rgba(0.12, 0.35, 0.45, 0.85)
-                        border.width: 1
-                        border.color: Qt.rgba(0.45, 0.85, 1.0, 0.45 + 0.35 * Math.sin(win.ionClock * 2.8))
-                    }
-                    Label {
-                        anchors.centerIn: parent
-                        text: "i"
-                        color: "#9fd7ff"
-                        font.pixelSize: 8
-                        font.bold: true
-                    }
-                    MouseArea {
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: win.showDidYouKnow("signal")
-                        onEntered: win.armDykHover("signal")
-                        onExited: win.disarmDykHover("signal")
-                    }
-                }
             }
         }
 
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 200
+            Layout.preferredHeight: 318
             radius: 16
             color: Qt.rgba(0.05, 0.09, 0.18, 0.86)
             border.width: 1
@@ -719,7 +687,7 @@ ApplicationWindow {
                 spacing: 12
 
                 Rectangle {
-                    Layout.preferredWidth: 230
+                    Layout.preferredWidth: 210
                     Layout.fillHeight: true
                     radius: 12
                     color: Qt.rgba(0.08, 0.13, 0.25, 0.95)
@@ -823,7 +791,7 @@ ApplicationWindow {
                 }
 
                 ColumnLayout {
-                    Layout.preferredWidth: 300
+                    Layout.preferredWidth: 326
                     Layout.fillHeight: true
                     spacing: 10
 
@@ -849,9 +817,9 @@ ApplicationWindow {
                                 width: parent.width
                                 text: win.listToBullets(win.howItWorksLines)
                                 color: "#c2d2e8"
-                                font.pixelSize: 11
+                                font.pixelSize: 10
                                 wrapMode: Text.WordWrap
-                                lineHeight: 1.2
+                                lineHeight: 1.15
                             }
                         }
                     }
@@ -878,9 +846,9 @@ ApplicationWindow {
                                 width: parent.width
                                 text: win.listToBullets(win.didYouKnowLines)
                                 color: "#c6cce0"
-                                font.pixelSize: 11
+                                font.pixelSize: 10
                                 wrapMode: Text.WordWrap
-                                lineHeight: 1.2
+                                lineHeight: 1.15
                             }
                         }
                     }
@@ -1704,6 +1672,20 @@ ApplicationWindow {
                 Button {
                     text: "Restart level"
                     onClicked: win.restartCurrentLevel()
+                    background: Rectangle {
+                        radius: 9
+                        color: parent.enabled ? "#253a55" : "#223245"
+                        border.width: 1
+                        border.color: parent.enabled ? "#7ba4d1" : "#51657a"
+                    }
+                    contentItem: Label {
+                        text: parent.text
+                        color: "#e0efff"
+                        font.pixelSize: 12
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
                 }
 
                 Button {
@@ -1711,16 +1693,19 @@ ApplicationWindow {
                     visible: win.pendingNextLevel && win.currentLevelIndex + 1 < Levels.levelCount()
                     enabled: !win.playbackActive
                     onClicked: win.goNextLevel()
-                }
-
-                Button {
-                    text: win.learningMode ? "Learning: ON" : "Learning: OFF"
-                    font.pixelSize: 11
-                    flat: true
-                    onClicked: {
-                        win.learningMode = !win.learningMode;
-                        if (!win.learningMode)
-                            win.dismissDidYouKnow();
+                    background: Rectangle {
+                        radius: 9
+                        color: parent.enabled ? "#1f7f71" : "#2d524d"
+                        border.width: 1
+                        border.color: parent.enabled ? "#77f3d5" : "#5d8d86"
+                    }
+                    contentItem: Label {
+                        text: parent.text
+                        color: "#e8fffa"
+                        font.pixelSize: 12
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
                     }
                 }
 
@@ -1730,16 +1715,6 @@ ApplicationWindow {
                     font.pixelSize: 10
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
-                }
-
-                Button {
-                    text: win.visibility === Window.FullScreen ? "Exit Fullscreen" : "Fullscreen"
-                    onClicked: {
-                        if (win.visibility === Window.FullScreen)
-                            win.showNormal();
-                        else
-                            win.showFullScreen();
-                    }
                 }
             }
         }
