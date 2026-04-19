@@ -2,6 +2,7 @@
     <qresource prefix="/">
         <file alias="qml/main.qml">main.qml</file>
         <file alias="qml/StoryVisual3D.qml">StoryVisual3D.qml</file>
+        <file alias="qml/AudioController.qml">AudioController.qml</file>
         <file alias="qml/js/signalSim.js">js/signalSim.js</file>
         <file alias="qml/js/levels.js">js/levels.js</file>
         <file alias="assets/ice_cream_truck.glb">../assets/ice_cream_truck.glb</file>
@@ -10,5 +11,11 @@
         <file alias="assets/baseball.glb">../assets/baseball.glb</file>
         <file alias="assets/apple.glb">../assets/apple.glb</file>
         <file alias="assets/human-brain.glb">../assets/human-brain.glb</file>
+        <file alias="assets/audio/click.wav">../assets/audio/click.wav</file>
+        <file alias="assets/audio/toggle_myelin.wav">../assets/audio/toggle_myelin.wav</file>
+        <file alias="assets/audio/node_regen.wav">../assets/audio/node_regen.wav</file>
+        <file alias="assets/audio/fail.wav">../assets/audio/fail.wav</file>
+        <file alias="assets/audio/success.wav">../assets/audio/success.wav</file>
+        <file alias="assets/audio/bgm_main.mp3">../assets/audio/bgm_main.mp3</file>
     </qresource>
 </RCC>

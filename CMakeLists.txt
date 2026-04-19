@@ -5,11 +5,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt5 5.12 QUIET COMPONENTS Core Quick QuickControls2 QuickLayouts)
+find_package(Qt5 5.12 QUIET COMPONENTS Core Quick QuickControls2 QuickLayouts Multimedia)
 if (Qt5_FOUND)
     set(QT_VER 5)
 else()
-    find_package(Qt6 REQUIRED COMPONENTS Core Quick QuickControls2 QuickLayouts Quick3D)
+    find_package(Qt6 REQUIRED COMPONENTS Core Quick QuickControls2 QuickLayouts Quick3D Multimedia)
     set(QT_VER 6)
 endif()
 
@@ -31,6 +31,7 @@ target_link_libraries(AxonSignals
     Qt${QT_VER}::Quick
     Qt${QT_VER}::QuickControls2
     Qt${QT_VER}::QuickLayouts
+    Qt${QT_VER}::Multimedia
 )
 
 if(QT_VER EQUAL 6)

@@ -67,7 +67,12 @@ ApplicationWindow {
     property real ionClock: 0
     property int storyTurntableFrame: 0
     property int storyTurntableFrameCount: 24
+    property int storyTurntableIntervalMs: 1000
     property string storyTurntableSource: ""
+    property var storyTurntableSources: []
+    property var storyTurntableLoadedFlags: ({})
+    property int storyTurntableLoadedCount: 0
+    property bool storyTurntableReady: false
     property bool story3dModuleEnabled: true
     property real playbackFailBlend: 0
     property real displayVoltage: -70
@@ -75,6 +80,8 @@ ApplicationWindow {
     property int displayAtp: 8
     property int nodeSpikeSeg: -1
     property real nodeSpikeBoost: 0
+    property bool musicEnabled: true
+    property bool sfxEnabled: true
 
     property bool learningMode: false
     property string dykPanelText: ""
@@ -246,6 +253,16 @@ ApplicationWindow {
         onTriggered: win.dismissDidYouKnow()
     }
 
+    Loader {
+        id: audioLoader
+        active: true
+        source: "AudioController.qml"
+        onStatusChanged: {
+            if (status === Loader.Ready)
+                win.updateMusicState();
+        }
+    }
+
     function syncAxonIndices() {
         var a = [];
         for (var k = 0; k < segmentCount; k++)
@@ -338,10 +355,24 @@ ApplicationWindow {
         return "../assets/renders/" + stem + "/" + stem + "_" + padFrameIndex(frameIndex) + ".png";
     }
 
+    function buildStoryTurntableSources() {
+        var list = [];
+        var meta = currentStory3dMeta();
+        for (var i = 0; i < storyTurntableFrameCount; i++)
+            list.push(resolveStoryTurntableFrameSource(meta.file, i));
+        return list;
+    }
+
     function updateStoryTurntableSource() {
-        storyTurntableSource = resolveStoryTurntableFrameSource(
-                    currentStory3dMeta().file,
-                    storyTurntableFrameIndex());
+        if (!storyTurntableSources || storyTurntableSources.length < storyTurntableFrameCount) {
+            storyTurntableSource = resolveStoryTurntableFrameSource(
+                        currentStory3dMeta().file,
+                        storyTurntableFrameIndex());
+            return;
+        }
+        var idx = storyTurntableFrameIndex();
+        if (idx >= 0 && idx < storyTurntableSources.length)
+            storyTurntableSource = storyTurntableSources[idx];
     }
 
     function currentStoryFallbackScale() {
@@ -363,6 +394,51 @@ ApplicationWindow {
         if (m.fallbackStartFrame !== undefined)
             return m.fallbackStartFrame;
         return 0;
+    }
+
+    function resetStoryTurntablePreload() {
+        storyTurntableFrame = currentStoryFallbackStartFrame();
+        storyTurntableSource = "";
+        storyTurntableReady = false;
+        storyTurntableLoadedCount = 0;
+        storyTurntableLoadedFlags = ({});
+        storyTurntableSources = buildStoryTurntableSources();
+    }
+
+    function onStoryTurntableFramePreload(frameIndex, status) {
+        if (status !== Image.Ready && status !== Image.Error)
+            return;
+        if (frameIndex < 0 || frameIndex >= storyTurntableFrameCount)
+            return;
+        if (storyTurntableLoadedFlags[frameIndex])
+            return;
+        var nextFlags = {};
+        for (var key in storyTurntableLoadedFlags)
+            nextFlags[key] = storyTurntableLoadedFlags[key];
+        nextFlags[frameIndex] = true;
+        storyTurntableLoadedFlags = nextFlags;
+        storyTurntableLoadedCount += 1;
+        if (storyTurntableLoadedCount >= storyTurntableFrameCount) {
+            storyTurntableReady = true;
+            updateStoryTurntableSource();
+        }
+    }
+
+    function playSfx(effect) {
+        if (!sfxEnabled || !effect)
+            return;
+        if (!audioLoader.item || !audioLoader.item.playSfx)
+            return;
+        audioLoader.item.playSfx(effect);
+    }
+
+    function updateMusicState() {
+        if (!audioLoader.item)
+            return;
+        audioLoader.item.musicEnabled = musicEnabled;
+        audioLoader.item.sfxEnabled = sfxEnabled;
+        if (audioLoader.item.updateMusicState)
+            audioLoader.item.updateMusicState();
     }
 
     function supportsStory3d() {
@@ -464,8 +540,7 @@ ApplicationWindow {
         segmentCount = path0.segmentCount;
         syncAxonIndices();
         myelin = path0.defaultMyelin.slice();
-        storyTurntableFrame = currentStoryFallbackStartFrame();
-        updateStoryTurntableSource();
+        resetStoryTurntablePreload();
         pendingNextLevel = false;
         refreshPreview();
         statusLine = L.scenarioText + " Choose a path, adjust myelin, then Send Signal.";
@@ -521,6 +596,7 @@ ApplicationWindow {
         playTimer.timeline = SignalSim.buildPlaybackTimeline(lastSim.steps, segmentCount, lastSim.config);
         playTimer.legIndex = 0;
         playTimer.legU = 0;
+        playTimer.regenSfxLegIndex = -1;
         if (playTimer.timeline.length === 0) {
             statusLine = "Nothing to animate.";
             return;
@@ -540,9 +616,12 @@ ApplicationWindow {
 
     Component.onCompleted: {
         applyLevel(0);
+        updateMusicState();
     }
 
     onSegmentCountChanged: syncAxonIndices()
+    onMusicEnabledChanged: updateMusicState()
+    onSfxEnabledChanged: updateMusicState()
 
     onMyelinChanged: {
         if (!playbackActive) {
@@ -577,14 +656,13 @@ ApplicationWindow {
 
     Timer {
         id: storyTurntableTimer
-        interval: 500
+        interval: win.storyTurntableIntervalMs
         repeat: true
         running: true
         onTriggered: {
-            if (win.storyTurntableFrameCount > 0)
-                win.storyTurntableFrame = (win.storyTurntableFrame + 1) % win.storyTurntableFrameCount;
-            else
-                win.storyTurntableFrame = 0;
+            if (!win.storyTurntableReady || win.storyTurntableFrameCount < 1)
+                return;
+            win.storyTurntableFrame = (win.storyTurntableFrame + 1) % win.storyTurntableFrameCount;
             win.updateStoryTurntableSource();
         }
     }
@@ -597,6 +675,7 @@ ApplicationWindow {
         property var timeline: []
         property int legIndex: 0
         property real legU: 0
+        property int regenSfxLegIndex: -1
 
         onTriggered: {
             if (timeline.length === 0) {
@@ -604,6 +683,10 @@ ApplicationWindow {
                 return;
             }
             var leg = timeline[legIndex];
+            if (leg.phase === "regen" && legIndex !== regenSfxLegIndex) {
+                regenSfxLegIndex = legIndex;
+                win.playSfx("node_regen");
+            }
             var stepScale = (!win.lastSim.ok) ? (1.0 - 0.35 * win.playbackFailBlend) : 1.0;
             legU += (interval / leg.durationMs) * stepScale;
             var sm = win.smoothstep(Math.min(1, legU));
@@ -633,6 +716,7 @@ ApplicationWindow {
                     win.playbackActive = false;
                     running = false;
                     if (win.lastSim.ok) {
+                        win.playSfx("success");
                         var thr = (win.lastSim.config && win.lastSim.config.brainActivationThreshold !== undefined)
                                 ? win.lastSim.config.brainActivationThreshold : 40;
                         var L = Levels.getLevel(win.currentLevelIndex);
@@ -645,6 +729,7 @@ ApplicationWindow {
                             win.pendingNextLevel = true;
                         }
                     } else {
+                        win.playSfx("fail");
                         var Lf = Levels.getLevel(win.currentLevelIndex);
                         win.statusLine = Lf.failFeedback + " (" + win.describeFail(win.lastSim.failReason) + ")";
                         win.pendingNextLevel = false;
@@ -797,7 +882,10 @@ ApplicationWindow {
                         text: "Neuron rules"
                         flat: true
                         font.pixelSize: compactUi ? 11 : 12
-                        onClicked: howDrawer.open()
+                        onClicked: {
+                            win.playSfx("click");
+                            howDrawer.open();
+                        }
                         contentItem: Label {
                             text: parent.text
                             color: "#9fd4ff"
@@ -994,14 +1082,41 @@ ApplicationWindow {
                             source: win.storyTurntableSource
                             fillMode: Image.PreserveAspectFit
                             smooth: true
-                            asynchronous: true
+                            asynchronous: false
                             cache: true
+                            visible: win.storyTurntableReady && source !== ""
+                        }
+
+                        Item {
+                            anchors.fill: parent
+                            opacity: 0.0
+                            Repeater {
+                                model: win.storyTurntableSources.length
+                                Image {
+                                    width: 1
+                                    height: 1
+                                    source: win.storyTurntableSources[index]
+                                    asynchronous: true
+                                    cache: true
+                                    onStatusChanged: win.onStoryTurntableFramePreload(index, status)
+                                }
+                            }
                         }
 
                         Label {
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.verticalCenter: parent.verticalCenter
-                            visible: storyTurntableImage.source === "" || storyTurntableImage.status === Image.Error
+                            visible: !win.storyTurntableReady
+                            text: "Loading visual..."
+                            color: "#a8c7e8"
+                            font.pixelSize: compactUi ? 11 : 12
+                        }
+
+                        Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: win.storyTurntableReady
+                                     && (storyTurntableImage.source === "" || storyTurntableImage.status === Image.Error)
                             text: Levels.getLevel(currentLevelIndex).scenarioEmoji || "?"
                             font.pixelSize: compactUi ? 52 : 64
                         }
@@ -1613,6 +1728,7 @@ ApplicationWindow {
                                         copy[axonIndex] = !copy[axonIndex];
                                         copy[axonIndex] = !!copy[axonIndex];
                                         win.myelin = copy;
+                                        win.playSfx("toggle_myelin");
                                     }
                                 }
                             }
@@ -1766,7 +1882,10 @@ ApplicationWindow {
                                 MouseArea {
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
-                                    onClicked: selectPath(pathIdx)
+                                    onClicked: {
+                                        win.playSfx("click");
+                                        selectPath(pathIdx);
+                                    }
                                 }
                             }
                         }
@@ -1857,6 +1976,7 @@ ApplicationWindow {
                     text: win.playbackActive ? "Running..." : "Send Signal"
                     enabled: !win.playbackActive
                     onClicked: {
+                        win.playSfx("click");
                         win.runAttempted = true;
                         win.stopPlayback();
                         win.lastSim = SignalSim.simulate(win.myelin, win.mergedSim());
@@ -1887,7 +2007,10 @@ ApplicationWindow {
 
                 Button {
                     text: "Restart level"
-                    onClicked: win.restartCurrentLevel()
+                    onClicked: {
+                        win.playSfx("click");
+                        win.restartCurrentLevel();
+                    }
                     background: Rectangle {
                         radius: 9
                         color: parent.enabled ? "#253a55" : "#223245"
@@ -1908,7 +2031,10 @@ ApplicationWindow {
                     text: "Next level"
                     visible: win.pendingNextLevel && win.currentLevelIndex + 1 < Levels.levelCount()
                     enabled: !win.playbackActive
-                    onClicked: win.goNextLevel()
+                    onClicked: {
+                        win.playSfx("click");
+                        win.goNextLevel();
+                    }
                     background: Rectangle {
                         radius: 9
                         color: parent.enabled ? "#1f7f71" : "#2d524d"
@@ -1933,6 +2059,54 @@ ApplicationWindow {
                     font.pixelSize: compactUi ? 9 : 10
                     Layout.fillWidth: true
                     wrapMode: Text.WordWrap
+                }
+
+                Button {
+                    text: win.musicEnabled ? "Music ON" : "Music OFF"
+                    onClicked: {
+                        var next = !win.musicEnabled;
+                        win.musicEnabled = next;
+                        if (next)
+                            win.playSfx("click");
+                    }
+                    background: Rectangle {
+                        radius: 8
+                        color: parent.enabled ? "#26364b" : "#223245"
+                        border.width: 1
+                        border.color: parent.enabled ? "#7ea4ca" : "#50657a"
+                    }
+                    contentItem: Label {
+                        text: parent.text
+                        color: "#e0efff"
+                        font.pixelSize: compactUi ? 10 : 11
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
+                }
+
+                Button {
+                    text: win.sfxEnabled ? "SFX ON" : "SFX OFF"
+                    onClicked: {
+                        var nextSfx = !win.sfxEnabled;
+                        win.sfxEnabled = nextSfx;
+                        if (nextSfx)
+                            win.playSfx("click");
+                    }
+                    background: Rectangle {
+                        radius: 8
+                        color: parent.enabled ? "#26364b" : "#223245"
+                        border.width: 1
+                        border.color: parent.enabled ? "#7ea4ca" : "#50657a"
+                    }
+                    contentItem: Label {
+                        text: parent.text
+                        color: "#e0efff"
+                        font.pixelSize: compactUi ? 10 : 11
+                        font.bold: true
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                    }
                 }
             }
         }
@@ -2013,7 +2187,10 @@ ApplicationWindow {
 
                 Button {
                     text: "Close"
-                    onClicked: howDrawer.close()
+                    onClicked: {
+                        win.playSfx("click");
+                        howDrawer.close();
+                    }
                 }
             }
         }
