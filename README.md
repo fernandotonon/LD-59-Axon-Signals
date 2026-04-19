@@ -31,7 +31,7 @@ Hash parameters are [documented here](https://clayground.mistergc.dev/docs/getti
 
 ## Local desktop build
 
-Requires Qt 5.12+ or Qt 6 (Quick, QuickControls2, QuickLayouts). From the repo root:
+Requires Qt 6 (Quick, QuickControls2, QuickLayouts, Quick3D). From the repo root:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release

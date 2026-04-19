@@ -9,7 +9,7 @@ find_package(Qt5 5.12 QUIET COMPONENTS Core Quick QuickControls2 QuickLayouts)
 if (Qt5_FOUND)
     set(QT_VER 5)
 else()
-    find_package(Qt6 REQUIRED COMPONENTS Core Quick QuickControls2 QuickLayouts)
+    find_package(Qt6 REQUIRED COMPONENTS Core Quick QuickControls2 QuickLayouts Quick3D)
     set(QT_VER 6)
 endif()
 
@@ -32,6 +32,10 @@ target_link_libraries(AxonSignals
     Qt${QT_VER}::QuickControls2
     Qt${QT_VER}::QuickLayouts
 )
+
+if(QT_VER EQUAL 6)
+  target_link_libraries(AxonSignals PRIVATE Qt6::Quick3D)
+endif()
 
 if(QT_VER EQUAL 6)
   qt_import_qml_plugins(AxonSignals)

@@ -3,5 +3,11 @@
         <file alias="qml/main.qml">main.qml</file>
         <file alias="qml/js/signalSim.js">js/signalSim.js</file>
         <file alias="qml/js/levels.js">js/levels.js</file>
+        <file alias="assets/ice_cream_truck.glb">../assets/ice_cream_truck.glb</file>
+        <file alias="assets/frying_pan.glb">../assets/frying_pan.glb</file>
+        <file alias="assets/nailed_plank.glb">../assets/nailed_plank.glb</file>
+        <file alias="assets/baseball.glb">../assets/baseball.glb</file>
+        <file alias="assets/apple.glb">../assets/apple.glb</file>
+        <file alias="assets/human-brain.glb">../assets/human-brain.glb</file>
     </qresource>
 </RCC>

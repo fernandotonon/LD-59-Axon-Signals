@@ -3,6 +3,7 @@
 import QtQuick 2.15
 import QtQuick.Controls 2.15
 import QtQuick.Layouts 1.15
+import QtQuick3D 1.15
 import "js/signalSim.js" as SignalSim
 import "js/levels.js" as Levels
 
@@ -96,6 +97,13 @@ ApplicationWindow {
             consequence: "A delayed response can mean food poisoning."
         }
     })
+    readonly property var levelVisual3dMeta: ({
+        1: { file: "ice_cream_truck.glb", scale: 18, rotX: -12, rotY: -16, rotZ: 0, posY: -16, camY: 24, camZ: 170 },
+        2: { file: "frying_pan.glb", scale: 36, rotX: -18, rotY: 20, rotZ: 0, posY: -24, camY: 28, camZ: 180 },
+        3: { file: "nailed_plank.glb", scale: 30, rotX: -14, rotY: -20, rotZ: 0, posY: -22, camY: 28, camZ: 190 },
+        4: { file: "baseball.glb", scale: 64, rotX: -12, rotY: -10, rotZ: 0, posY: -18, camY: 22, camZ: 164 },
+        5: { file: "apple.glb", scale: 56, rotX: -10, rotY: -18, rotZ: 0, posY: -18, camY: 22, camZ: 168 }
+    })
     readonly property var howItWorksLines: [
         "Myelin protects the signal and reduces loss.",
         "Nodes of Ranvier regenerate the signal.",
@@ -187,6 +195,27 @@ ApplicationWindow {
             urgency: L.timePressureLabel,
             consequence: L.failFeedback
         };
+    }
+
+    function currentStory3dMeta() {
+        var L = currentLevelData();
+        return levelVisual3dMeta[L.id] ? levelVisual3dMeta[L.id] : {
+            file: "human-brain.glb",
+            scale: 28,
+            rotX: -10,
+            rotY: 12,
+            rotZ: 0,
+            posY: -20,
+            camY: 24,
+            camZ: 170
+        };
+    }
+
+    function resolveStoryAssetSource(filename) {
+        var base = "" + Qt.resolvedUrl("main.qml");
+        if (base.indexOf("qrc:/") === 0)
+            return "qrc:/assets/" + filename;
+        return "../assets/" + filename;
     }
 
     function listToBullets(lines) {
@@ -711,11 +740,70 @@ ApplicationWindow {
                         border.color: Qt.rgba(0.66, 0.83, 1.0, 0.24)
                     }
 
-                    Label {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: Levels.getLevel(currentLevelIndex).scenarioEmoji || "?"
-                        font.pixelSize: 64
+                    View3D {
+                        id: storyView3d
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        renderMode: View3D.Offscreen
+                        environment: SceneEnvironment {
+                            clearColor: "#0d152b"
+                            backgroundMode: SceneEnvironment.Color
+                            antialiasingMode: SceneEnvironment.MSAA
+                            antialiasingQuality: SceneEnvironment.High
+                        }
+                        camera: storyCam
+
+                        PerspectiveCamera {
+                            id: storyCam
+                            readonly property var m: win.currentStory3dMeta()
+                            position: Qt.vector3d(0, m.camY, m.camZ)
+                            eulerRotation.x: -8
+                        }
+
+                        DirectionalLight {
+                            eulerRotation.x: -35
+                            eulerRotation.y: -25
+                            brightness: 1.35
+                        }
+
+                        PointLight {
+                            position: Qt.vector3d(42, 38, 78)
+                            brightness: 120
+                            quadraticFade: 0.08
+                            color: "#82c6ff"
+                        }
+
+                        PointLight {
+                            position: Qt.vector3d(-48, -24, 52)
+                            brightness: 65
+                            quadraticFade: 0.11
+                            color: "#ffb775"
+                        }
+
+                        Node {
+                            readonly property var m: win.currentStory3dMeta()
+                            y: m.posY
+
+                            Model {
+                                id: storyModel
+                                source: win.resolveStoryAssetSource(m.file)
+                                scale: Qt.vector3d(m.scale, m.scale, m.scale)
+                                eulerRotation.x: m.rotX
+                                eulerRotation.y: m.rotY + win.ionClock * 10
+                                eulerRotation.z: m.rotZ
+                                castsShadows: true
+                                receivesShadows: true
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.bottom: parent.bottom
+                        height: 34
+                        radius: 8
+                        color: Qt.rgba(0.06, 0.12, 0.24, 0.58)
                     }
 
                     Label {
