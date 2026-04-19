@@ -2,7 +2,7 @@ name: QtMesh Scan
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
 
 jobs:
   scan-assets-qtmesh:
