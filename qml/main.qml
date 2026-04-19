@@ -67,6 +67,7 @@ ApplicationWindow {
     property real ionClock: 0
     property int storyTurntableFrame: 0
     property int storyTurntableFrameCount: 24
+    property string storyTurntableSource: ""
     property bool story3dModuleEnabled: true
     property real playbackFailBlend: 0
     property real displayVoltage: -70
@@ -110,11 +111,71 @@ ApplicationWindow {
         }
     })
     readonly property var levelVisual3dMeta: ({
-        1: { file: "ice_cream_truck.glb", scale: 18, rotX: -12, rotY: -16, rotZ: 0, posY: -16, camY: 24, camZ: 170 },
-        2: { file: "frying_pan.glb", scale: 36, rotX: -18, rotY: 20, rotZ: 0, posY: -24, camY: 28, camZ: 180 },
-        3: { file: "nailed_plank.glb", scale: 30, rotX: -14, rotY: -20, rotZ: 0, posY: -22, camY: 28, camZ: 190 },
-        4: { file: "baseball.glb", scale: 64, rotX: -12, rotY: -10, rotZ: 0, posY: -18, camY: 22, camZ: 164 },
-        5: { file: "apple.glb", scale: 56, rotX: -10, rotY: -18, rotZ: 0, posY: -18, camY: 22, camZ: 168 }
+        1: {
+            file: "ice_cream_truck.glb",
+            scale: 18,
+            rotX: -12,
+            rotY: -16,
+            rotZ: 0,
+            posY: -16,
+            camY: 24,
+            camZ: 170,
+            fallbackScale: 1.0,
+            fallbackOffsetY: 0,
+            fallbackStartFrame: 4
+        },
+        2: {
+            file: "frying_pan.glb",
+            scale: 36,
+            rotX: -18,
+            rotY: 20,
+            rotZ: 0,
+            posY: -24,
+            camY: 28,
+            camZ: 180,
+            fallbackScale: 1.0,
+            fallbackOffsetY: 0,
+            fallbackStartFrame: 6
+        },
+        3: {
+            file: "nailed_plank.glb",
+            scale: 30,
+            rotX: -14,
+            rotY: -20,
+            rotZ: 0,
+            posY: -22,
+            camY: 28,
+            camZ: 190,
+            fallbackScale: 1.05,
+            fallbackOffsetY: 0,
+            fallbackStartFrame: 8
+        },
+        4: {
+            file: "baseball.glb",
+            scale: 64,
+            rotX: -12,
+            rotY: -10,
+            rotZ: 0,
+            posY: -18,
+            camY: 22,
+            camZ: 164,
+            fallbackScale: 1.0,
+            fallbackOffsetY: 0,
+            fallbackStartFrame: 0
+        },
+        5: {
+            file: "apple.glb",
+            scale: 56,
+            rotX: -10,
+            rotY: -18,
+            rotZ: 0,
+            posY: -18,
+            camY: 22,
+            camZ: 168,
+            fallbackScale: 1.0,
+            fallbackOffsetY: 0,
+            fallbackStartFrame: 0
+        }
     })
     readonly property var howItWorksLines: [
         "Myelin protects the signal and reduces loss.",
@@ -219,7 +280,10 @@ ApplicationWindow {
             rotZ: 0,
             posY: -20,
             camY: 24,
-            camZ: 170
+            camZ: 170,
+            fallbackScale: 1.0,
+            fallbackOffsetY: 0,
+            fallbackStartFrame: 0
         };
     }
 
@@ -272,6 +336,33 @@ ApplicationWindow {
             return "";
         var stem = storyAssetStem(filename);
         return "../assets/renders/" + stem + "/" + stem + "_" + padFrameIndex(frameIndex) + ".png";
+    }
+
+    function updateStoryTurntableSource() {
+        storyTurntableSource = resolveStoryTurntableFrameSource(
+                    currentStory3dMeta().file,
+                    storyTurntableFrameIndex());
+    }
+
+    function currentStoryFallbackScale() {
+        var m = currentStory3dMeta();
+        if (m.fallbackScale !== undefined)
+            return m.fallbackScale;
+        return 1.0;
+    }
+
+    function currentStoryFallbackOffsetY() {
+        var m = currentStory3dMeta();
+        if (m.fallbackOffsetY !== undefined)
+            return m.fallbackOffsetY;
+        return 0;
+    }
+
+    function currentStoryFallbackStartFrame() {
+        var m = currentStory3dMeta();
+        if (m.fallbackStartFrame !== undefined)
+            return m.fallbackStartFrame;
+        return 0;
     }
 
     function supportsStory3d() {
@@ -373,6 +464,8 @@ ApplicationWindow {
         segmentCount = path0.segmentCount;
         syncAxonIndices();
         myelin = path0.defaultMyelin.slice();
+        storyTurntableFrame = currentStoryFallbackStartFrame();
+        updateStoryTurntableSource();
         pendingNextLevel = false;
         refreshPreview();
         statusLine = L.scenarioText + " Choose a path, adjust myelin, then Send Signal.";
@@ -492,6 +585,7 @@ ApplicationWindow {
                 win.storyTurntableFrame = (win.storyTurntableFrame + 1) % win.storyTurntableFrameCount;
             else
                 win.storyTurntableFrame = 0;
+            win.updateStoryTurntableSource();
         }
     }
 
@@ -886,16 +980,18 @@ ApplicationWindow {
                         id: storyFallbackLayer
                         anchors.fill: parent
                         anchors.margins: 8
+                        clip: true
                         visible: !win.supportsStory3d()
                                  || story3dLoader.status !== Loader.Ready
                                  || !story3dLoader.item.modelReady
 
                         Image {
-                            id: storyTurntableFrame
-                            anchors.fill: parent
-                            source: win.resolveStoryTurntableFrameSource(
-                                        win.currentStory3dMeta().file,
-                                        win.storyTurntableFrameIndex())
+                            id: storyTurntableImage
+                            anchors.centerIn: parent
+                            anchors.verticalCenterOffset: win.currentStoryFallbackOffsetY()
+                            width: parent.width * win.currentStoryFallbackScale()
+                            height: parent.height * win.currentStoryFallbackScale()
+                            source: win.storyTurntableSource
                             fillMode: Image.PreserveAspectFit
                             smooth: true
                             asynchronous: true
@@ -905,7 +1001,7 @@ ApplicationWindow {
                         Label {
                             anchors.horizontalCenter: parent.horizontalCenter
                             anchors.verticalCenter: parent.verticalCenter
-                            visible: storyTurntableFrame.source === "" || storyTurntableFrame.status === Image.Error
+                            visible: storyTurntableImage.source === "" || storyTurntableImage.status === Image.Error
                             text: Levels.getLevel(currentLevelIndex).scenarioEmoji || "?"
                             font.pixelSize: compactUi ? 52 : 64
                         }

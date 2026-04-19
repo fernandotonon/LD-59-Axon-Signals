@@ -86,6 +86,14 @@ Environment variables:
 - `MODEL_TILT_DEG` static model tilt angle (default `-8`)
 - `BLENDER_BIN` explicit Blender binary path (auto-detected if omitted)
 
+### Normalize framing (trim + center + scale)
+
+After rendering, normalize all frame sequences so models are centered and consistently sized in the story card:
+
+```bash
+./tools/normalize_turntable_frames.sh
+```
+
 ### One-click redirect (GitHub Pages optional)
 
 `play.html` already points at the raw `main.qml` for this repo. If you enable **GitHub Pages**, visitors can open `…/play.html` for a one-click redirect to Web Dojo.
