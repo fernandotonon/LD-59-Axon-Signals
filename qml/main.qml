@@ -66,7 +66,8 @@ ApplicationWindow {
     property real signalAlong: 0
     property real ionClock: 0
     property int storyTurntableFrame: 0
-    readonly property int storyTurntableFrameCount: 24
+    property int storyTurntableFrameCount: 24
+    property bool story3dModuleEnabled: true
     property real playbackFailBlend: 0
     property real displayVoltage: -70
     property real displaySignalStrength: 100
@@ -237,7 +238,10 @@ ApplicationWindow {
     }
 
     function padFrameIndex(v) {
-        var n = Math.max(0, Math.floor(v));
+        var n = Number(v);
+        if (!isFinite(n))
+            n = 0;
+        n = Math.max(0, Math.floor(n));
         if (n < 10)
             return "00" + n;
         if (n < 100)
@@ -246,16 +250,23 @@ ApplicationWindow {
     }
 
     function storyTurntableFrameIndex() {
-        var frames = storyTurntableFrameCount;
+        var frames = Number(storyTurntableFrameCount);
+        if (!isFinite(frames) || frames < 1)
+            frames = 24;
+        var current = Number(storyTurntableFrame);
+        if (!isFinite(current))
+            current = 0;
         if (frames <= 0)
             return 0;
-        var idx = storyTurntableFrame % frames;
+        var idx = Math.floor(current) % frames;
         if (idx < 0)
             idx += frames;
         return idx;
     }
 
     function resolveStoryTurntableFrameSource(filename, frameIndex) {
+        if (!filename || filename === "")
+            return "";
         var base = "" + Qt.resolvedUrl("main.qml");
         if (base.indexOf("qrc:/") === 0)
             return "";
@@ -264,7 +275,7 @@ ApplicationWindow {
     }
 
     function supportsStory3d() {
-        return true;
+        return story3dModuleEnabled;
     }
 
     function listToBullets(lines) {
@@ -476,7 +487,12 @@ ApplicationWindow {
         interval: 500
         repeat: true
         running: true
-        onTriggered: win.storyTurntableFrame = (win.storyTurntableFrame + 1) % win.storyTurntableFrameCount
+        onTriggered: {
+            if (win.storyTurntableFrameCount > 0)
+                win.storyTurntableFrame = (win.storyTurntableFrame + 1) % win.storyTurntableFrameCount;
+            else
+                win.storyTurntableFrame = 0;
+        }
     }
 
     Timer {
@@ -805,6 +821,10 @@ ApplicationWindow {
                         anchors.margins: 8
                         active: win.supportsStory3d()
                         source: "StoryVisual3D.qml"
+                        onStatusChanged: {
+                            if (status === Loader.Error)
+                                win.story3dModuleEnabled = false;
+                        }
                     }
 
                     Binding {
