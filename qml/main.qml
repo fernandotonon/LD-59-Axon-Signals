@@ -2218,23 +2218,50 @@ ApplicationWindow {
             acceptedButtons: Qt.AllButtons
         }
 
-        EndingScreen {
+        Loader {
+            id: endingScreenLoader
             anchors.fill: parent
-            visible: win.showEndingScreen
-            levelResultsModel: win.endingSummaryModel
-            supportsStory3d: win.supportsStory3d()
-            brainModelSource: win.resolveStoryAssetSource("human-brain.glb")
-            brainSpinClock: win.ionClock
+            active: win.showEndingScreen
+            source: "EndingScreen.qml"
+        }
 
-            onRestartRequested: {
+        Binding {
+            target: endingScreenLoader.item
+            property: "levelResultsModel"
+            value: win.endingSummaryModel
+            when: endingScreenLoader.status === Loader.Ready
+        }
+        Binding {
+            target: endingScreenLoader.item
+            property: "supportsStory3d"
+            value: win.supportsStory3d()
+            when: endingScreenLoader.status === Loader.Ready
+        }
+        Binding {
+            target: endingScreenLoader.item
+            property: "brainModelSource"
+            value: win.resolveStoryAssetSource("human-brain.glb")
+            when: endingScreenLoader.status === Loader.Ready
+        }
+        Binding {
+            target: endingScreenLoader.item
+            property: "brainSpinClock"
+            value: win.ionClock
+            when: endingScreenLoader.status === Loader.Ready
+        }
+
+        Connections {
+            target: endingScreenLoader.item
+            enabled: endingScreenLoader.status === Loader.Ready
+            function onRestartRequested() {
                 win.playSfx("click");
                 win.restartGameFromEnding();
             }
-            onReplayRequested: {
+            function onReplayRequested() {
                 win.playSfx("click");
                 win.replayLevelsFromEnding();
             }
-            onRulesRequested: {
+            function onRulesRequested() {
                 win.playSfx("click");
                 win.showEndingScreen = false;
                 win.howDrawer.open();
