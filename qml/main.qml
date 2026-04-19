@@ -9,14 +9,15 @@ import "js/levels.js" as Levels
 ApplicationWindow {
     id: win
     visible: true
-    width: 980
-    height: 760
+    width: 1000
+    height: 820
     title: "Axon Signals"
-    color: "#070910"
+    color: "#060814"
 
     property int segmentCount: 26
-    property int cellOuterWidth: 28
-    property int axonSpacing: 4
+    property int cellOuterWidth: 44
+    property int axonSpacing: 8
+    readonly property int axonRowHeight: 186
     readonly property int axonTrackWidth: segmentCount * cellOuterWidth + (segmentCount - 1) * axonSpacing + 24
     // Dense [0..n-1] for Repeater; assigned in syncAxonIndices (not a readonly recompute) so Web/Qt builds
     // do not collapse delegates or mis-bind modelData.
@@ -363,8 +364,9 @@ ApplicationWindow {
     Rectangle {
         anchors.fill: parent
         gradient: Gradient {
-            GradientStop { position: 0.0; color: "#05060c" }
-            GradientStop { position: 1.0; color: "#0c1220" }
+            GradientStop { position: 0.0; color: "#070a18" }
+            GradientStop { position: 0.55; color: "#0a0d22" }
+            GradientStop { position: 1.0; color: "#120a1e" }
         }
     }
 
@@ -442,91 +444,84 @@ ApplicationWindow {
     ColumnLayout {
         id: mainCol
         anchors.fill: parent
-        anchors.margins: 18
-        spacing: 10
+        anchors.margins: 12
+        spacing: 12
 
         RowLayout {
             Layout.fillWidth: true
             spacing: 14
-            Label {
-                text: "Axon Signals"
-                color: "#e8f6ff"
-                font.pixelSize: 24
-                font.bold: true
-            }
-            Button {
-                text: "Neuron rules"
-                font.pixelSize: 11
-                flat: true
-                onClicked: howDrawer.open()
+            RowLayout {
+                spacing: 10
+                Label {
+                    text: "Axon Signals"
+                    color: "#eef3f8"
+                    font.pixelSize: 20
+                    font.bold: true
+                }
+                Button {
+                    text: "Neuron rules"
+                    font.pixelSize: 11
+                    flat: true
+                    onClicked: howDrawer.open()
+                }
             }
             Item { Layout.fillWidth: true }
-            Label {
-                text: "Strength: <b>" + Math.round(win.playbackActive ? win.displaySignalStrength : win.lastSim.signalStrength) + "</b>"
-                color: "#9fd7ff"
-                textFormat: Text.RichText
-                font.pixelSize: 12
-            }
-            Label {
-                text: "ATP: <b>" + (win.playbackActive ? win.displayAtp : win.lastSim.atp) + "</b>"
-                color: "#7cf5c6"
-                textFormat: Text.RichText
-                font.pixelSize: 12
-            }
-            Label {
-                text: "Brain: <b>≥ " + Math.round(Levels.getLevel(currentLevelIndex).brainActivationThreshold)
-                        + " mV</b> · str ≥ <b>"
-                        + ((lastSim.config && lastSim.config.brainActivationThreshold !== undefined)
-                           ? Math.round(lastSim.config.brainActivationThreshold) : 40) + "</b>"
-                color: "#d49bff"
-                textFormat: Text.RichText
-                font.pixelSize: 11
-            }
-            Label {
-                text: "~Vm: <b>" + Math.round((win.playbackActive ? win.displayVoltage : win.lastSim.voltage) * 10) / 10 + " mV</b>"
-                color: "#8ec5ff"
-                textFormat: Text.RichText
-                font.pixelSize: 11
-            }
-            Label {
-                text: "Rest/Thr: <b>" + ((lastSim.config && lastSim.config.restingPotential !== undefined)
-                        ? Math.round(lastSim.config.restingPotential) : -70) + " / "
-                        + ((lastSim.config && lastSim.config.thresholdPotential !== undefined)
- ? Math.round(lastSim.config.thresholdPotential) : -55) + " mV</b>"
-                color: "#9aa8c0"
-                textFormat: Text.RichText
-                font.pixelSize: 10
-            }
-            Label {
-                text: "Weakest: <b>" + Math.round(lastSim.lowestSignalStrength !== undefined ? lastSim.lowestSignalStrength : lastSim.signalStrength) + "</b>"
-                color: "#c8b8ff"
-                textFormat: Text.RichText
-                font.pixelSize: 11
-            }
-            Label {
-                text: lastSim.ok ? "<span style='color:#9af'>OK</span>" : "<span style='color:#f88'>Risk</span>"
-                textFormat: Text.RichText
-                font.pixelSize: 13
+            ColumnLayout {
+                Layout.alignment: Qt.AlignRight | Qt.AlignTop
+                spacing: 4
+                Label {
+                    Layout.alignment: Qt.AlignRight
+                    horizontalAlignment: Text.AlignRight
+                    textFormat: Text.RichText
+                    font.pixelSize: 11
+                    color: "#aeb8c9"
+                    text: "<span style='color:#c5ccd6'>Signal</span> <b style='color:#f2fdff'>"
+                            + Math.round(win.playbackActive ? win.displaySignalStrength : win.lastSim.signalStrength)
+                            + "</b> &nbsp;<span style='color:#6d7688'>|</span>&nbsp; "
+                            + "<span style='color:#c5ccd6'>ATP</span> <b style='color:#cdeee0'>"
+                            + (win.playbackActive ? win.displayAtp : win.lastSim.atp) + "</b>"
+                }
+                Label {
+                    Layout.alignment: Qt.AlignRight
+                    horizontalAlignment: Text.AlignRight
+                    textFormat: Text.RichText
+                    font.pixelSize: 10
+                    color: "#949eac"
+                    text: "Goal: Reach <b>Brain</b> · strength ≥ <b>"
+                            + ((lastSim.config && lastSim.config.brainActivationThreshold !== undefined)
+                               ? Math.round(lastSim.config.brainActivationThreshold) : 40) + "</b>"
+                }
+                Label {
+                    Layout.alignment: Qt.AlignRight
+                    horizontalAlignment: Text.AlignRight
+                    textFormat: Text.RichText
+                    font.pixelSize: 9
+                    color: "#7a8494"
+                    text: "Weakest <b>" + Math.round(lastSim.lowestSignalStrength !== undefined
+                            ? lastSim.lowestSignalStrength : lastSim.signalStrength) + "</b> · "
+                            + (lastSim.ok ? "<span style='color:#9dd8b8'>stable</span>"
+                                          : "<span style='color:#f0a8a8'>risk</span>")
+                }
             }
             Item {
                 id: signalDykMarker
-                Layout.preferredWidth: 16
-                Layout.preferredHeight: 16
+                Layout.preferredWidth: 18
+                Layout.preferredHeight: 18
                 Layout.alignment: Qt.AlignVCenter
                 visible: win.learningMode
                 Rectangle {
                     anchors.centerIn: parent
-                    width: 12
-                    height: 12
-                    radius: 6
+                    width: 14
+                    height: 14
+                    radius: 7
                     color: Qt.rgba(0.12, 0.35, 0.45, 0.85)
                     border.width: 1
-                    border.color: Qt.rgba(0.45, 1.0, 0.85, 0.45 + 0.35 * Math.sin(win.ionClock * 2.8))
+                    border.color: Qt.rgba(0.45, 0.85, 1.0, 0.45 + 0.35 * Math.sin(win.ionClock * 2.8))
                 }
                 Label {
                     anchors.centerIn: parent
                     text: "i"
-                    color: "#7cf5c6"
+                    color: "#9fd7ff"
                     font.pixelSize: 8
                     font.bold: true
                 }
@@ -543,191 +538,56 @@ ApplicationWindow {
 
         RowLayout {
             Layout.fillWidth: true
+            Layout.fillHeight: true
+            Layout.minimumHeight: win.axonRowHeight + 48
             spacing: 10
             Label {
-                text: "Level " + (currentLevelIndex + 1) + " / " + Levels.levelCount()
-                color: "#7ad8ff"
-                font.bold: true
-                font.pixelSize: 12
-            }
-            ColumnLayout {
-                Layout.fillWidth: true
-                spacing: 2
-                Label {
-                    text: Levels.getLevel(currentLevelIndex).title
-                    color: "#e8f6ff"
-                    font.pixelSize: 18
-                    font.bold: true
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                }
-                Label {
-                    text: Levels.getLevel(currentLevelIndex).scenarioText
-                    color: "#9aa8c0"
-                    font.pixelSize: 12
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                }
-                Label {
-                    text: {
-                        var L = Levels.getLevel(currentLevelIndex);
-                        "Scenario tuning: " + L.startVoltage + " mV start · node penalty +"
-                                + L.nodePenalty + " · myelin loss " + Math.abs(L.myelinBoost)
-                                + "/myelin seg · brain ≤ " + L.brainActivationThreshold + " mV";
-                    }
-                    color: "#5c6578"
-                    font.pixelSize: 10
-                    Layout.fillWidth: true
-                    wrapMode: Text.WordWrap
-                }
-            }
-        }
-
-        Label {
-            Layout.fillWidth: true
-            text: timePressureText
-            wrapMode: Text.WordWrap
-            color: "#ffb070"
-            font.pixelSize: 11
-            font.italic: true
-            opacity: 0.55 + 0.45 * Math.abs(Math.sin(ionClock * 1.65))
-        }
-
-        ColumnLayout {
-            Layout.fillWidth: true
-            spacing: 6
-            Label {
-                text: "Paths — tap one to select"
-                color: "#7a8699"
-                font.pixelSize: 11 }
-            Repeater {
-                model: activePaths
-                delegate: Rectangle {
-                    property int pathIdx: index
-                    property var pathItem: modelData
-
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 64
-                    radius: 8
-                    color: pathIdx === selectedPathIndex ? "#101a2a" : "#080d14"
-                    border.width: pathIdx === selectedPathIndex ? 2 : 1
-                    border.color: pathIdx === selectedPathIndex ? "#4dd4b0" : "#2a3850"
-
-                    RowLayout {
-                        anchors.fill: parent
-                        anchors.margins: 8
-                        spacing: 10
-
-                        Rectangle {
-                            Layout.preferredWidth: 10
-                            Layout.preferredHeight: 10
-                            radius: 5
-                            color: pathIdx === selectedPathIndex ? "#4dd4b0" : "#3a4a60"
-                        }
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 2
-                            Label {
-                                text: pathItem.label
-                                color: "#e8f6ff"
-                                font.pixelSize: 12
-                                font.bold: true
-                                Layout.fillWidth: true
-                                wrapMode: Text.WordWrap
-                            }
-                            Label {
-                                text: pathItem.hint
-                                color: "#7a8699"
-                                font.pixelSize: 10
-                                Layout.fillWidth: true
-                                wrapMode: Text.WordWrap
-                            }
-                        }
-
-                        Row {
-                            spacing: 2
-                            Layout.alignment: Qt.AlignVCenter
-                            Repeater {
-                                model: pathItem.segmentCount
-                                Rectangle {
-                                    width: 3
-                                    height: 22
-                                    radius: 1
-                                    color: pathMyelinByte(pathIdx, index) ? "#2d9a58" : "#b65c20"
-                                }
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: selectPath(pathIdx)
-                    }
-                }
-            }
-        }
-
-        Label {
-            Layout.fillWidth: true
-            wrapMode: Text.WordWrap
-            text: statusLine
-            color: "#b8c7dd"
-            font.pixelSize: 12
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            spacing: 8
-            Label {
                 text: Levels.getLevel(currentLevelIndex).startOrgan
-                color: "#5bd0ff"
+                color: "#aeb9ca"
                 font.bold: true
-                font.pixelSize: 12
+                font.pixelSize: 11
+                horizontalAlignment: Text.AlignHCenter
                 Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: 58
+                wrapMode: Text.WordWrap
             }
 
             Item {
                 id: axonBand
-                Layout.alignment: Qt.AlignHCenter
-                Layout.preferredWidth: Math.min(axonTrackWidth, Math.max(180, mainCol.width - 96))
-                Layout.minimumWidth: 140
-                height: 156
-                clip: false
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                Layout.minimumHeight: win.axonRowHeight + 32
 
                 Rectangle {
                     anchors.fill: parent
-                    radius: 12
-                    color: "#0c101c"
-                    border.color: "#223047"
+                    radius: 18
+                    color: Qt.rgba(0.04, 0.06, 0.11, 0.45)
                     border.width: 1
+                    border.color: Qt.rgba(0.55, 0.58, 0.78, 0.12)
+                }
 
-                    Flickable {
-                        id: axonFlick
-                        anchors.fill: parent
-                        anchors.margins: 8
-                        contentWidth: axonRow.width
-                        contentHeight: height
-                        clip: true
-                        Row {
-                            id: axonRow
-                            spacing: axonSpacing
-                            height: 132
-                            x: Math.max(0, (axonFlick.width - width) / 2)
+                Flickable {
+                    id: axonFlick
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    contentWidth: axonRow.width
+                    contentHeight: height
+                    clip: true
+                    Row {
+                        id: axonRow
+                        spacing: win.axonSpacing
+                        height: win.axonRowHeight
+                        x: Math.max(0, (axonFlick.width - width) / 2)
 
-                            Repeater {
-                                model: win.axonIndices
+                        Repeater {
+                            model: win.axonIndices
 
                                 Item {
-                                    id: cell
                                     width: win.cellOuterWidth
                                     height: axonRow.height
 
                                     readonly property int axonIndex: ((typeof modelData !== "undefined") && (modelData !== null)) ? modelData : index
-
                                     readonly property bool isEnd: axonIndex === 0 || axonIndex === win.segmentCount - 1
-                                    // Bounds + truthy sheath flag (myelin array must be length segmentCount after toggle).
                                     readonly property bool isMyelin: {
                                         var m = win.myelin;
                                         var i = axonIndex;
@@ -738,256 +598,119 @@ ApplicationWindow {
                                     readonly property bool isRanvier: !isMyelin
 
                                     readonly property real sigDist: Math.abs(
-                                        axonIndex - win.signalAlong * (win.segmentCount - 1))
-                                    readonly property bool nearPulse: win.playbackActive && sigDist < 0.95
+                                            axonIndex - win.signalAlong * (win.segmentCount - 1))
+                                    readonly property bool nearPulse: win.playbackActive && sigDist < 0.68
 
                                     readonly property real liveStrength: win.playbackActive ? win.displaySignalStrength : win.lastSim.signalStrength
                                     readonly property real strCap: (win.lastSim.config && win.lastSim.config.initialSignalStrength)
                                             ? win.lastSim.config.initialSignalStrength : 100
                                     readonly property real normStrength: Math.max(0, Math.min(1, liveStrength / strCap))
-                                    readonly property real sigStrength: 0.15 + 0.85 * normStrength
                                     readonly property real collapseRisk: 1.0 - normStrength
-                                    readonly property real pulseBase: {
-                                        if (!win.playbackActive)
-                                            return 0;
-                                        if (sigDist < 0.48)
-                                            return 0.72 * (1 - sigDist / 0.48);
-                                        return 0;
-                                    }
-                                    readonly property real spikeBoost: (win.nodeSpikeSeg === axonIndex) ? win.nodeSpikeBoost * 0.95 : 0
-                                    readonly property real pulseGlow: {
-                                        var flickNode = (!isMyelin && collapseRisk > 0.22)
-                                                ? (0.1 + 0.22 * collapseRisk) * Math.abs(Math.sin(win.ionClock * (9.5 + 10 * collapseRisk)))
-                                                : 0;
-                                        var flickMyelin = isMyelin ? 0.04 * Math.sin(win.ionClock * 2.2) : 0;
-                                        var flick = isMyelin ? flickMyelin : flickNode;
-                                        return pulseBase * sigStrength * (1 - 0.58 * collapseRisk) * (1 - 0.45 * win.playbackFailBlend) + spikeBoost + flick;
+                                    readonly property real pulseFlicker: collapseRisk > 0.36
+                                            ? (0.48 + 0.52 * Math.abs(Math.sin(win.ionClock * (10.0 + 24.0 * collapseRisk))))
+                                            : (0.9 + 0.1 * Math.sin(win.ionClock * 2.6))
+                                    readonly property real spikeBoost: (win.nodeSpikeSeg === axonIndex) ? win.nodeSpikeBoost : 0
+
+                                    Item {
+                                        z: 25
+                                        anchors.centerIn: parent
+                                        width: parent.width * 2.55
+                                        height: parent.height * 0.92
+                                        visible: nearPulse
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: parent.width * 0.92
+                                            height: parent.height * 0.86
+                                            radius: width * 0.5
+                                            color: Qt.rgba(0.32, 0.74, 1.0, (0.08 + 0.44 * parent.parent.normStrength) * parent.parent.pulseFlicker)
+                                        }
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: parent.width * 0.54
+                                            height: parent.height * 0.58
+                                            radius: width * 0.5
+                                            color: Qt.rgba(0.88, 0.96, 1.0, (0.22 + 0.68 * parent.parent.normStrength) * parent.parent.pulseFlicker)
+                                            border.width: 2
+                                            border.color: Qt.rgba(0.45, 0.88, 1.0, 0.95)
+                                        }
+                                        Rectangle {
+                                            anchors.centerIn: parent
+                                            width: parent.width * 0.24
+                                            height: parent.height * 0.26
+                                            radius: width * 0.5
+                                            color: Qt.rgba(1, 1, 1, 0.42 + 0.55 * parent.parent.normStrength)
+                                        }
                                     }
 
                                     Rectangle {
                                         z: 0
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: (isMyelin ? 24 : 22) * (0.9 + 0.1 * normStrength)
-                                        height: 100 * (0.94 + 0.06 * normStrength)
-                                        radius: 9
-                                        border.width: isMyelin ? 1 : 3
-                                        border.color: isMyelin ? "#1e3a28" : "#ff9933"
-                                        gradient: Gradient {
-                                            GradientStop {
-                                                position: 0
-                                                color: isMyelin ? "#2d9a58" : "#7a4528"
-                                            }
-                                            GradientStop {
-                                                position: 0.5
-                                                color: isMyelin ? "#1f6b3a" : "#4a2818"
-                                            }
-                                            GradientStop {
-                                                position: 1
-                                                color: isMyelin ? "#14321f" : "#2a150e"
-                                            }
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        z: 1
                                         visible: isMyelin
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.verticalCenter: parent.verticalCenter
-                                        width: 7
-                                        height: 90
-                                        radius: 3
-                                        color: "#1a5c32"
-                                        opacity: 0.5
-                                        anchors.horizontalCenterOffset: -10
+                                        width: 30
+                                        height: 124
+                                        radius: 15
+                                        color: "#2a4540"
+                                        border.width: 1
+                                        border.color: "#1e3430"
+                                    }
+
+                                    Rectangle {
+                                        z: 0
+                                        visible: isRanvier
+                                        anchors.horizontalCenter: parent.horizontalCenter
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 34
+                                        height: 130
+                                        radius: 17
+                                        color: "#231a16"
+                                        border.width: 2
+                                        border.color: Qt.rgba(1, 0.48, 0.18, 0.42 + 0.4 * spikeBoost + (nearPulse ? 0.22 : 0))
                                     }
                                     Rectangle {
                                         z: 1
-                                        visible: isMyelin
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 7
-                                        height: 90
-                                        radius: 3
-                                        color: "#1a5c32"
-                                        opacity: 0.5
-                                        anchors.horizontalCenterOffset: 10
+                                        visible: isRanvier
+                                        anchors.centerIn: parent
+                                        width: 46
+                                        height: 142
+                                        radius: 23
+                                        color: "transparent"
+                                        border.width: 1
+                                        border.color: Qt.rgba(1, 0.42, 0.15, 0.14 + 0.3 * spikeBoost + 0.22 * nearPulse)
                                     }
-
                                     Rectangle {
                                         z: 2
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        width: 5
-                                        height: 74
-                                        radius: 2
-                                        color: "#2ed3ff"
-                                        opacity: isMyelin ? 0.25 : 0.72
+                                        visible: isRanvier
+                                        anchors.centerIn: parent
+                                        width: 26
+                                        height: 112
+                                        radius: 13
+                                        color: "transparent"
+                                        border.width: 3
+                                        border.color: Qt.rgba(1, 0.52, 0.22, 0.52 + 0.38 * spikeBoost + (nearPulse ? 0.2 : 0))
                                     }
 
                                     Rectangle {
                                         z: 3
-                                        visible: isRanvier
-                                        anchors.centerIn: parent
-                                        width: 20
-                                        height: 84
-                                        radius: 8
-                                        color: "transparent"
-                                        border.width: 2
-                                        border.color: Qt.rgba(0.35, 0.95, 1.0,
-                                            0.1 + 0.82 * pulseGlow + 0.5 * spikeBoost)
-                                        opacity: 0.18 + pulseGlow * 0.78 + spikeBoost * 0.48
-                                    }
-
-                                    Column {
-                                        z: 6
-                                        visible: isRanvier
-                                        anchors.centerIn: parent
-                                        spacing: 6
-                                        Rectangle {
-                                            width: 12
-                                            height: 3
-                                            radius: 1
-                                            color: "#ffb070"
-                                            border.width: 1
-                                            border.color: "#ffcca8"
-                                            opacity: 0.52
-                                        }
-                                        Rectangle {
-                                            width: 12
-                                            height: 3
-                                            radius: 1
-                                            color: "#ffb070"
-                                            border.width: 1
-                                            border.color: "#ffcca8"
-                                            opacity: 0.66
-                                        }
-                                        Rectangle {
-                                            width: 12
-                                            height: 3
-                                            radius: 1
-                                            color: "#ffb070"
-                                            border.width: 1
-                                            border.color: "#ffcca8"
-                                            opacity: 0.8
-                                        }
-                                        Rectangle {
-                                            width: 12
-                                            height: 3
-                                            radius: 1
-                                            color: "#ffb070"
-                                            border.width: 1
-                                            border.color: "#ffcca8"
-                                            opacity: 0.94
-                                        }
-                                    }
-
-                                    Item {
-                                        z: 10
-                                        visible: isRanvier
                                         anchors.horizontalCenter: parent.horizontalCenter
-                                        anchors.top: parent.top
-                                        anchors.topMargin: 5
-                                        width: 24
-                                        height: 24
-                                        Rectangle {
-                                            x: 1
-                                            y: 3
-                                            width: 9
-                                            height: 15
-                                            radius: 3
-                                            color: (nearPulse || spikeBoost > 0.2) ? "#8eb6ff" : "#4d6aa8"
-                                            border.color: "#bcd6ff"
-                                            border.width: 1
-                                            transform: Rotation {
-                                                origin.x: 4.5
-                                                origin.y: 7.5
-                                                axis: Qt.vector3d(0, 0, 1)
-                                                angle: (nearPulse || spikeBoost > 0.15)
-                                                        ? 14 * Math.sin(win.ionClock * 2.4)
-                                                        : 3 * Math.sin(win.ionClock * 0.85)
-                                            }
-                                        }
-                                        Rectangle {
-                                            x: 13
-                                            y: 3
-                                            width: 9
-                                            height: 15
-                                            radius: 3
-                                            color: (nearPulse || spikeBoost > 0.2) ? "#a8c4ff" : "#556db0"
-                                            border.color: "#dce8ff"
-                                            border.width: 1
-                                            transform: Rotation {
-                                                origin.x: 4.5
-                                                origin.y: 7.5
-                                                axis: Qt.vector3d(0, 0, 1)
-                                                angle: (nearPulse || spikeBoost > 0.15)
-                                                        ? -12 * Math.sin(win.ionClock * 2.1 + 0.3)
-                                                        : -2.5 * Math.sin(win.ionClock * 0.8)
-                                            }
-                                        }
-                                        Rectangle {
-                                            anchors.centerIn: parent
-                                            width: 5
-                                            height: 5
-                                            radius: 2.5
-                                            color: "#ffff99"
-                                            opacity: spikeBoost > 0.1 ? 0.55 + 0.4 * spikeBoost
-                                                                   : (nearPulse ? 0.38 : 0.12)
-                                        }
-                                    }
-
-                                    Item {
-                                        z: 11
-                                        visible: isRanvier
-                                        anchors.horizontalCenter: parent.horizontalCenter
-                                        anchors.bottom: parent.bottom
-                                        anchors.bottomMargin: 8
-                                        width: 22
-                                        height: 20
-                                        Rectangle {
-                                            width: 4
-                                            height: 4
-                                            radius: 2
-                                            color: "#ffd54a"
-                                            x: 2 + 2 * Math.sin(win.ionClock + axonIndex)
-                                            y: 4 + (nearPulse ? 5 * Math.sin(win.ionClock * 4) : 2 * Math.sin(win.ionClock))
-                                        }
-                                        Rectangle {
-                                            width: 4
-                                            height: 4
-                                            radius: 2
-                                            color: "#ffd54a"
-                                            x: 11
-                                            y: 10 + (nearPulse ? 4 * Math.cos(win.ionClock * 3.5) : 1.5 * Math.cos(win.ionClock))
-                                        }
-                                        Rectangle {
-                                            width: 4
-                                            height: 4
-                                            radius: 2
-                                            color: "#c77dff"
-                                            x: 7 + 2 * Math.cos(win.ionClock * 0.9)
-                                            y: 2 + (nearPulse ? 4 * Math.sin(win.ionClock * 3.2) : 1 * Math.sin(win.ionClock))
-                                        }
-                                        Rectangle {
-                                            width: 4
-                                            height: 4
-                                            radius: 2
-                                            color: "#c77dff"
-                                            x: 16
-                                            y: 12 + (nearPulse ? 3 * Math.cos(win.ionClock * 4) : 1 * Math.cos(win.ionClock))
-                                        }
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: 4
+                                        height: isMyelin ? 70 : 88
+                                        radius: 2
+                                        color: isMyelin ? Qt.rgba(0.42, 0.68, 0.6, 0.2) : Qt.rgba(1, 0.5, 0.22, 0.16)
+                                        visible: isMyelin || isRanvier
                                     }
 
                                     Label {
-                                        z: 4
+                                        z: 6
                                         anchors.horizontalCenter: parent.horizontalCenter
                                         anchors.bottom: parent.bottom
-                                        anchors.bottomMargin: 1
+                                        anchors.bottomMargin: 3
                                         text: axonIndex === 0 ? Levels.getLevel(win.currentLevelIndex).startMarker
                                                              : (axonIndex === win.segmentCount - 1 ? "B" : "")
-                                        color: "#9fe8ff"
-                                        font.pixelSize: 8
+                                        color: "#d4dce8"
+                                        font.pixelSize: 10
+                                        font.bold: true
                                     }
 
                                     Item {
@@ -1003,14 +726,14 @@ ApplicationWindow {
                                             width: 13
                                             height: 13
                                             radius: 6
-                                            color: Qt.rgba(0.06, 0.22, 0.18, 0.92)
+                                            color: Qt.rgba(0.08, 0.22, 0.2, 0.9)
                                             border.width: 1
-                                            border.color: Qt.rgba(0.35, 1.0, 0.65, 0.4 + 0.35 * Math.sin(win.ionClock * 3.1))
+                                            border.color: Qt.rgba(0.35, 0.75, 0.65, 0.45 + 0.35 * Math.sin(win.ionClock * 3.1))
                                         }
                                         Label {
                                             anchors.centerIn: parent
                                             text: "i"
-                                            color: "#9af7c8"
+                                            color: "#9af0d8"
                                             font.pixelSize: 9
                                             font.bold: true
                                         }
@@ -1036,9 +759,9 @@ ApplicationWindow {
                                             width: 13
                                             height: 13
                                             radius: 6
-                                            color: Qt.rgba(0.25, 0.12, 0.06, 0.9)
+                                            color: Qt.rgba(0.28, 0.14, 0.08, 0.9)
                                             border.width: 1
-                                            border.color: Qt.rgba(1.0, 0.65, 0.35, 0.45 + 0.35 * Math.sin(win.ionClock * 2.9))
+                                            border.color: Qt.rgba(1.0, 0.55, 0.3, 0.5 + 0.35 * Math.sin(win.ionClock * 2.9))
                                         }
                                         Label {
                                             anchors.centerIn: parent
@@ -1070,9 +793,9 @@ ApplicationWindow {
                                             width: 9
                                             height: 9
                                             radius: 4
-                                            color: Qt.rgba(0.55, 0.65, 1.0, 0.25 + 0.35 * Math.sin(win.ionClock * 4.2))
+                                            color: Qt.rgba(1, 0.55, 0.25, 0.22 + 0.35 * Math.sin(win.ionClock * 4.2))
                                             border.width: 1
-                                            border.color: Qt.rgba(0.75, 0.85, 1.0, 0.65)
+                                            border.color: Qt.rgba(1, 0.65, 0.35, 0.55)
                                         }
                                         MouseArea {
                                             anchors.fill: parent
@@ -1100,7 +823,6 @@ ApplicationWindow {
                                         }
                                     }
                                 }
-                            }
                         }
                     }
                 }
@@ -1108,14 +830,178 @@ ApplicationWindow {
 
             Label {
                 text: "Brain"
-                color: "#d49bff"
+                color: "#c9bddc"
                 font.bold: true
-                font.pixelSize: 12
+                font.pixelSize: 11
+                horizontalAlignment: Text.AlignHCenter
                 Layout.alignment: Qt.AlignVCenter
+                Layout.preferredWidth: 44
             }
         }
 
+        Rectangle {
+            Layout.fillWidth: true
+            implicitHeight: storyColumn.implicitHeight + 24
+            radius: 12
+            color: Qt.rgba(0.06, 0.08, 0.14, 0.72)
+            border.width: 1
+            border.color: Qt.rgba(0.55, 0.6, 0.78, 0.14)
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.margins: 12
+                spacing: 14
+                Label {
+                    text: Levels.getLevel(currentLevelIndex).scenarioEmoji || ""
+                    font.pixelSize: 34
+                    Layout.alignment: Qt.AlignTop
+                }
+                ColumnLayout {
+                    id: storyColumn
+                    Layout.fillWidth: true
+                    spacing: 8
+                    Label {
+                        text: "Level " + (currentLevelIndex + 1) + " / " + Levels.levelCount()
+                                + " — " + Levels.getLevel(currentLevelIndex).title
+                        color: "#9ad4ff"
+                        font.bold: true
+                        font.pixelSize: 12
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                    }
+                    Label {
+                        text: Levels.getLevel(currentLevelIndex).scenarioText
+                        color: "#e2e8f0"
+                        font.pixelSize: 14
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                        lineHeight: 1.18
+                    }
+                    Label {
+                        text: timePressureText
+                        wrapMode: Text.WordWrap
+                        color: "#d4a574"
+                        font.pixelSize: 11
+                        font.italic: true
+                        Layout.fillWidth: true
+                        opacity: 0.75 + 0.25 * Math.abs(Math.sin(ionClock * 1.55))
+                    }
+                    Label {
+                        text: {
+                            var L = Levels.getLevel(currentLevelIndex);
+                            "Tuning · " + L.startVoltage + " mV · node +" + L.nodePenalty + " · sheath loss "
+                                    + Math.abs(L.myelinBoost) + "/seg · Vm brain ≤ " + L.brainActivationThreshold;
+                        }
+                        color: "#6c7383"
+                        font.pixelSize: 9
+                        Layout.fillWidth: true
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+        }
+
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 6
+            Label {
+                text: "Paths — tap one to select"
+                color: "#7a8699"
+                font.pixelSize: 11 }
+            Repeater {
+                model: activePaths
+                delegate: Item {
+                    property int pathIdx: index
+                    property var pathItem: modelData
+
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 70
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: -3
+                        radius: 12
+                        visible: pathIdx === selectedPathIndex
+                        color: Qt.rgba(1, 0.52, 0.22, 0.08)
+                        border.width: 2
+                        border.color: Qt.rgba(1, 0.58, 0.3, 0.72)
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 10
+                        color: pathIdx === selectedPathIndex ? "#121c2c" : "#0a1018"
+                        border.width: 1
+                        border.color: pathIdx === selectedPathIndex ? Qt.rgba(1, 0.55, 0.28, 0.35) : "#252d3a"
+                        opacity: pathIdx === selectedPathIndex ? 1 : 0.66
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.margins: 10
+                            spacing: 10
+
+                            Rectangle {
+                                Layout.preferredWidth: 10
+                                Layout.preferredHeight: 10
+                                radius: 5
+                                color: pathIdx === selectedPathIndex ? "#ff8a4a" : "#3a4555"
+                            }
+
+                            ColumnLayout {
+                                Layout.fillWidth: true
+                                spacing: 3
+                                Label {
+                                    text: pathItem.label
+                                    color: "#e8eef5"
+                                    font.pixelSize: 12
+                                    font.bold: true
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                }
+                                Label {
+                                    text: pathItem.hint
+                                    color: pathIdx === selectedPathIndex ? "#9aa8b8" : "#7d8896"
+                                    font.pixelSize: 10
+                                    Layout.fillWidth: true
+                                    wrapMode: Text.WordWrap
+                                }
+                            }
+
+                            Row {
+                                spacing: 3
+                                Layout.alignment: Qt.AlignVCenter
+                                Repeater {
+                                    model: pathItem.segmentCount
+                                    Rectangle {
+                                        width: 3
+                                        height: 22
+                                        radius: 1
+                                        color: pathMyelinByte(pathIdx, index) ? "#2f6f5a" : "#c45c28"
+                                    }
+                                }
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: selectPath(pathIdx)
+                        }
+                    }
+                }
+            }
+        }
+
+        Label {
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            text: statusLine
+            color: "#c9d4e4"
+            font.pixelSize: 12
+        }
+
         RowLayout {
+            Layout.fillWidth: true
             spacing: 10
             Button {
                 text: win.playbackActive ? "Running..." : "Send Signal"
@@ -1155,13 +1041,14 @@ ApplicationWindow {
                 }
             }
             Label {
-                text: "Click interior cells to toggle myelin. Nodes regenerate the signal (ATP cost); myelin reduces loss between nodes."
-                color: "#7a8699"
-                font.pixelSize: 11
+                text: "Tap interior segments to toggle myelin (sheath vs node). Send Signal to run the wave."
+                color: "#8b95a8"
+                font.pixelSize: 10
                 Layout.fillWidth: true
                 wrapMode: Text.WordWrap
             }
         }
+
     }
 
     Drawer {
