@@ -19,6 +19,7 @@ Item {
     property real glowPulse: 0
     property int brainFrameCount: 24
     property int brainFrameIntervalMs: 980
+    property int staticSpriteFrameIndex: 2
     property int brainFrame: 0
     property string brainSpriteSource: ""
     property var brainSpriteSources: []
@@ -59,12 +60,12 @@ Item {
     }
 
     function resetBrainSprites() {
-        brainFrame = 0;
-        brainSpriteSource = resolveBrainSpriteSource(0);
-        brainSpriteReady = false;
+        brainFrame = staticSpriteFrameIndex;
+        brainSpriteSource = resolveBrainSpriteSource(staticSpriteFrameIndex);
+        brainSpriteReady = true;
         brainSpriteLoadedCount = 0;
         brainSpriteLoadedFlags = ({});
-        rebuildBrainSources();
+        brainSpriteSources = [];
     }
 
     function onBrainSpritePreload(index, status) {
@@ -132,7 +133,7 @@ Item {
         id: brainSpinTimer
         interval: root.brainFrameIntervalMs
         repeat: true
-        running: root.visible
+        running: false
         onTriggered: {
             if (root.brainFrameCount < 2)
                 return;
@@ -493,11 +494,14 @@ Item {
 
         Item { Layout.fillHeight: true }
 
-        Label {
+        Text {
             Layout.alignment: Qt.AlignHCenter
-            text: "3D assets powered by QtMesh"
-            color: Qt.rgba(0.68, 0.78, 0.92, 0.6)
+            textFormat: Text.RichText
+            text: "<a href=\"https://qtmesh.dev\" style=\"color:#a8bfdb;text-decoration:none;\">3D assets powered by QtMesh Cloud</a>"
             font.pixelSize: 10
+            onLinkActivated: function(link) {
+                Qt.openUrlExternally(link);
+            }
         }
     }
 }

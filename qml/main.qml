@@ -71,6 +71,7 @@ ApplicationWindow {
     property int storyTurntableFrame: 0
     property int storyTurntableFrameCount: 24
     property int storyTurntableIntervalMs: 1000
+    property int staticSpriteFrameIndex: 2
     property string storyTurntableSource: ""
     property var storyTurntableSources: []
     property var storyTurntableLoadedFlags: ({})
@@ -348,7 +349,7 @@ ApplicationWindow {
                 success: found ? true : false,
                 strength: found ? found.strength : "--",
                 atp: found ? found.atp : "--",
-                sprite0: resolveLevelSpriteFrameSource(level.id, 0)
+                sprite0: resolveLevelSpriteFrameSource(level.id, staticSpriteFrameIndex)
             });
         }
         return out;
@@ -504,20 +505,17 @@ ApplicationWindow {
     }
 
     function currentStoryFallbackStartFrame() {
-        var m = currentStory3dMeta();
-        if (m.fallbackStartFrame !== undefined)
-            return m.fallbackStartFrame;
-        return 0;
+        return staticSpriteFrameIndex;
     }
 
     function resetStoryTurntablePreload() {
         storyTurntableFrame = currentStoryFallbackStartFrame();
         storyTurntableSource = resolveStoryTurntableFrameSource(
                     currentStory3dMeta().file, storyTurntableFrameIndex());
-        storyTurntableReady = false;
+        storyTurntableReady = true;
         storyTurntableLoadedCount = 0;
         storyTurntableLoadedFlags = ({});
-        storyTurntableSources = buildStoryTurntableSources();
+        storyTurntableSources = [];
     }
 
     function onStoryTurntableFramePreload(frameIndex, status) {
@@ -790,7 +788,7 @@ ApplicationWindow {
         id: storyTurntableTimer
         interval: win.storyTurntableIntervalMs
         repeat: true
-        running: true
+        running: false
         onTriggered: {
             if (win.storyTurntableFrameCount < 2)
                 return;
