@@ -1,3 +1,12 @@
+[![qtmesh status](https://api.qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-status.svg)](https://qtmesh.dev)
+[![qtmesh score](https://api.qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-score.svg)](https://qtmesh.dev)
+[![qtmesh errors](https://api.qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-errors.svg)](https://qtmesh.dev)
+[![qtmesh warnings](https://api.qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-warnings.svg)](https://qtmesh.dev)
+[![qtmesh models](https://api.qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-models.svg)](https://qtmesh.dev)
+[![qtmesh animations](https://api.qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-animations.svg)](https://qtmesh.dev)
+[![qtmesh skeletons](https://api.qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-skeletons.svg)](https://qtmesh.dev)
+[![qtmesh materials](https://api.qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-materials.svg)](https://qtmesh.dev)
+
 # Axon Signals (LD prototype)
 
 Toggle myelin on a discrete axon (click segments). A simplified **membrane potential (mV) + ATP** model drives success: myelin segments decay Vm slowly; **Ranvier nodes** (gaps between sheaths, plus foot/brain ends) reset Vm to −55 mV and spend ATP. Pumps and ions appear **only** on those nodes. The pulse runs in the same view.
