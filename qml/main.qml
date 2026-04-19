@@ -227,6 +227,38 @@ ApplicationWindow {
         return "../assets/" + filename;
     }
 
+    function storyAssetStem(filename) {
+        var dot = filename.lastIndexOf(".");
+        if (dot <= 0)
+            return filename;
+        return filename.slice(0, dot);
+    }
+
+    function padFrameIndex(v) {
+        var n = Math.max(0, Math.floor(v));
+        if (n < 10)
+            return "00" + n;
+        if (n < 100)
+            return "0" + n;
+        return "" + n;
+    }
+
+    function storyTurntableFrameIndex() {
+        var frames = 24;
+        var idx = Math.floor((ionClock * 7.2) % frames);
+        if (idx < 0)
+            idx += frames;
+        return idx;
+    }
+
+    function resolveStoryTurntableFrameSource(filename, frameIndex) {
+        var base = "" + Qt.resolvedUrl("main.qml");
+        if (base.indexOf("qrc:/") === 0)
+            return "";
+        var stem = storyAssetStem(filename);
+        return "../assets/renders/" + stem + "/" + stem + "_" + padFrameIndex(frameIndex) + ".png";
+    }
+
     function supportsStory3d() {
         return true;
     }
@@ -818,12 +850,31 @@ ApplicationWindow {
                         when: story3dLoader.status === Loader.Ready
                     }
 
-                    Label {
-                        anchors.horizontalCenter: parent.horizontalCenter
-                        anchors.verticalCenter: parent.verticalCenter
+                    Item {
+                        id: storyFallbackLayer
+                        anchors.fill: parent
+                        anchors.margins: 8
                         visible: !win.supportsStory3d() || story3dLoader.status !== Loader.Ready
-                        text: Levels.getLevel(currentLevelIndex).scenarioEmoji || "?"
-                        font.pixelSize: compactUi ? 52 : 64
+
+                        Image {
+                            id: storyTurntableFrame
+                            anchors.fill: parent
+                            source: win.resolveStoryTurntableFrameSource(
+                                        win.currentStory3dMeta().file,
+                                        win.storyTurntableFrameIndex())
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
+                            asynchronous: true
+                            cache: true
+                        }
+
+                        Label {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: storyTurntableFrame.source === "" || storyTurntableFrame.status === Image.Error
+                            text: Levels.getLevel(currentLevelIndex).scenarioEmoji || "?"
+                            font.pixelSize: compactUi ? 52 : 64
+                        }
                     }
 
                     Rectangle {
