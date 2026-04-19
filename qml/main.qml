@@ -65,6 +65,8 @@ ApplicationWindow {
     property bool playbackActive: false
     property real signalAlong: 0
     property real ionClock: 0
+    property int storyTurntableFrame: 0
+    readonly property int storyTurntableFrameCount: 24
     property real playbackFailBlend: 0
     property real displayVoltage: -70
     property real displaySignalStrength: 100
@@ -244,8 +246,10 @@ ApplicationWindow {
     }
 
     function storyTurntableFrameIndex() {
-        var frames = 24;
-        var idx = Math.floor((ionClock * 7.2) % frames);
+        var frames = storyTurntableFrameCount;
+        if (frames <= 0)
+            return 0;
+        var idx = storyTurntableFrame % frames;
         if (idx < 0)
             idx += frames;
         return idx;
@@ -465,6 +469,14 @@ ApplicationWindow {
         repeat: true
         running: true
         onTriggered: win.ionClock += win.playbackActive ? 0.14 : 0.04
+    }
+
+    Timer {
+        id: storyTurntableTimer
+        interval: 500
+        repeat: true
+        running: true
+        onTriggered: win.storyTurntableFrame = (win.storyTurntableFrame + 1) % win.storyTurntableFrameCount
     }
 
     Timer {
