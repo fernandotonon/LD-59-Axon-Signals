@@ -58,6 +58,9 @@ ApplicationWindow {
     property int selectedPathIndex: 0
     property var activePaths: []
     property var pathMyelinCache: ({})
+    property var levelResults: []
+    property var endingSummaryModel: []
+    property bool showEndingScreen: false
     property bool pendingNextLevel: false
     property string timePressureText: ""
     property bool runAttempted: false
@@ -276,6 +279,96 @@ ApplicationWindow {
 
     function currentLevelData() {
         return Levels.getLevel(currentLevelIndex);
+    }
+
+    function shortLevelTitle(level) {
+        if (!level || !level.title)
+            return "Level";
+        if (level.id === 2)
+            return "Hot Pan";
+        if (level.id === 3)
+            return "Nail";
+        if (level.id === 5)
+            return "Spoiled Food";
+        return level.title;
+    }
+
+    function recordLevelSuccess(levelIndex, strength, atp) {
+        var level = Levels.getLevel(levelIndex);
+        var out = [];
+        var found = false;
+        for (var i = 0; i < levelResults.length; i++) {
+            var item = levelResults[i];
+            if (item.id === level.id) {
+                out.push({
+                    id: level.id,
+                    title: shortLevelTitle(level),
+                    emoji: level.scenarioEmoji || "•",
+                    strength: Math.round(strength),
+                    atp: Math.round(atp),
+                    success: true
+                });
+                found = true;
+            } else {
+                out.push(item);
+            }
+        }
+        if (!found) {
+            out.push({
+                id: level.id,
+                title: shortLevelTitle(level),
+                emoji: level.scenarioEmoji || "•",
+                strength: Math.round(strength),
+                atp: Math.round(atp),
+                success: true
+            });
+        }
+        levelResults = out;
+    }
+
+    function buildEndingSummary() {
+        var out = [];
+        for (var i = 0; i < Levels.levelCount(); i++) {
+            var level = Levels.getLevel(i);
+            var found = null;
+            for (var j = 0; j < levelResults.length; j++) {
+                if (levelResults[j].id === level.id) {
+                    found = levelResults[j];
+                    break;
+                }
+            }
+            out.push({
+                id: level.id,
+                title: shortLevelTitle(level),
+                shortTitle: shortLevelTitle(level),
+                emoji: level.scenarioEmoji || "•",
+                success: found ? true : false,
+                strength: found ? found.strength : "--",
+                atp: found ? found.atp : "--"
+            });
+        }
+        return out;
+    }
+
+    function showEnding() {
+        endingSummaryModel = buildEndingSummary();
+        pendingNextLevel = false;
+        howDrawer.close();
+        showEndingScreen = true;
+    }
+
+    function restartGameFromEnding() {
+        showEndingScreen = false;
+        levelResults = [];
+        endingSummaryModel = [];
+        pendingNextLevel = false;
+        applyLevel(0);
+    }
+
+    function replayLevelsFromEnding() {
+        showEndingScreen = false;
+        pendingNextLevel = false;
+        applyLevel(0);
     }
 
     function missionMeta() {
@@ -528,6 +621,7 @@ ApplicationWindow {
 
     function applyLevel(idx) {
         stopPlayback();
+        showEndingScreen = false;
         currentLevelIndex = idx;
         selectedPathIndex = 0;
         pathMyelinCache = {};
@@ -717,6 +811,7 @@ ApplicationWindow {
                     running = false;
                     if (win.lastSim.ok) {
                         win.playSfx("success");
+                        win.recordLevelSuccess(win.currentLevelIndex, win.lastSim.signalStrength, win.lastSim.atp);
                         var thr = (win.lastSim.config && win.lastSim.config.brainActivationThreshold !== undefined)
                                 ? win.lastSim.config.brainActivationThreshold : 40;
                         var L = Levels.getLevel(win.currentLevelIndex);
@@ -725,6 +820,7 @@ ApplicationWindow {
                         if (win.currentLevelIndex + 1 >= Levels.levelCount()) {
                             win.statusLine += " All scenarios cleared!";
                             win.pendingNextLevel = false;
+                            win.showEnding();
                         } else {
                             win.pendingNextLevel = true;
                         }
@@ -2108,6 +2204,40 @@ ApplicationWindow {
                         verticalAlignment: Text.AlignVCenter
                     }
                 }
+            }
+        }
+    }
+
+    Item {
+        anchors.fill: parent
+        visible: win.showEndingScreen
+        z: 30000
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.AllButtons
+        }
+
+        EndingScreen {
+            anchors.fill: parent
+            visible: win.showEndingScreen
+            levelResultsModel: win.endingSummaryModel
+            supportsStory3d: win.supportsStory3d()
+            brainModelSource: win.resolveStoryAssetSource("human-brain.glb")
+            brainSpinClock: win.ionClock
+
+            onRestartRequested: {
+                win.playSfx("click");
+                win.restartGameFromEnding();
+            }
+            onReplayRequested: {
+                win.playSfx("click");
+                win.replayLevelsFromEnding();
+            }
+            onRulesRequested: {
+                win.playSfx("click");
+                win.showEndingScreen = false;
+                win.howDrawer.open();
             }
         }
     }
