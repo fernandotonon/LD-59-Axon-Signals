@@ -60,6 +60,32 @@ cd qml && python3 -m http.server 9000
 
 For live reload, use `pip install clay_dev_server` and `clay-dev-server`, then **Connect** from the Dev Server pane in Web Dojo (see the same docs page).
 
+## Pre-render 3D Models To PNG Turntables
+
+Web Dojo may not support Qt Quick 3D model rendering in all environments.  
+Use this pipeline to pre-render `.glb/.gltf` assets into transparent PNG turntables:
+
+```bash
+./tools/render_turntables.sh
+```
+
+Output goes to `assets/renders/<model_name>/` as frame sequences like:
+
+`assets/renders/ice_cream_truck/ice_cream_truck_000.png`
+
+### Optional quality controls
+
+```bash
+FRAMES=36 SIZE=768 ./tools/render_turntables.sh
+```
+
+Environment variables:
+
+- `FRAMES` number of images around 360° (default `24`)
+- `SIZE` output width/height in pixels (default `640`)
+- `MODEL_TILT_DEG` static model tilt angle (default `-8`)
+- `BLENDER_BIN` explicit Blender binary path (auto-detected if omitted)
+
 ### One-click redirect (GitHub Pages optional)
 
 `play.html` already points at the raw `main.qml` for this repo. If you enable **GitHub Pages**, visitors can open `…/play.html` for a one-click redirect to Web Dojo.
