@@ -7,6 +7,10 @@
 [![qtmesh skeletons](https://api.qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-skeletons.svg)](https://qtmesh.dev)
 [![qtmesh materials](https://api.qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-materials.svg)](https://qtmesh.dev)
 
+
+[![QtMesh Cloud summary](https://qtmesh.dev/v1/u/fernandotonon/p/ld-59-axon-signals/badges/qtmesh-share-card.svg)](https://qtmesh.dev)
+
+
 # Axon Signals (LD prototype)
 
 Toggle myelin on a discrete axon (click segments). A simplified **membrane potential (mV) + ATP** model drives success: myelin segments decay Vm slowly; **Ranvier nodes** (gaps between sheaths, plus foot/brain ends) reset Vm to −55 mV and spend ATP. Pumps and ions appear **only** on those nodes. The pulse runs in the same view.
