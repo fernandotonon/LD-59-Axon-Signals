@@ -12,7 +12,7 @@ Item {
     property bool musicEnabled: true
     property bool sfxEnabled: true
     property var howItWorksLines: []
-    readonly property int coverPadding: Math.max(20, Math.min(50, Math.floor(Math.min(width, height) * 0.06)))
+    readonly property int coverPadding: 20
 
     signal startRequested()
     signal musicToggleRequested()
@@ -73,15 +73,13 @@ Item {
         anchors.margins: root.coverPadding
         radius: 28
         color: Qt.rgba(0.05, 0.09, 0.2, 0.94)
-        border.width: 1
-        border.color: Qt.rgba(0.56, 0.78, 1.0, 0.3)
         clip: true
 
         Image {
             anchors.fill: parent
             anchors.margins: 8
             source: root.coverSource
-            fillMode: Image.PreserveAspectCrop
+            fillMode: Image.PreserveAspectFit
             asynchronous: true
             smooth: true
             cache: true
@@ -100,8 +98,6 @@ Item {
             anchors.margins: 8
             radius: 20
             color: "transparent"
-            border.width: 1
-            border.color: Qt.rgba(0.75, 0.9, 1.0, 0.14)
         }
     }
 
