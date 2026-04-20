@@ -12,6 +12,7 @@ Item {
     property bool musicEnabled: true
     property bool sfxEnabled: true
     property var howItWorksLines: []
+    readonly property int coverPadding: Math.max(20, Math.min(50, Math.floor(Math.min(width, height) * 0.06)))
 
     signal startRequested()
     signal musicToggleRequested()
@@ -63,26 +64,50 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: "#080d20" }
-            GradientStop { position: 0.55; color: "#0b1232" }
-            GradientStop { position: 1.0; color: "#110c24" }
-        }
+        color: "#050913"
     }
 
-    Image {
+    Rectangle {
+        id: coverFrame
         anchors.fill: parent
-        source: root.coverSource
-        fillMode: Image.PreserveAspectCrop
-        asynchronous: true
-        smooth: true
-        cache: true
-        opacity: status === Image.Ready ? 0.9 : 0.0
+        anchors.margins: root.coverPadding
+        radius: 28
+        color: Qt.rgba(0.05, 0.09, 0.2, 0.94)
+        border.width: 1
+        border.color: Qt.rgba(0.56, 0.78, 1.0, 0.3)
+        clip: true
+
+        Image {
+            anchors.fill: parent
+            anchors.margins: 8
+            source: root.coverSource
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            smooth: true
+            cache: true
+            opacity: status === Image.Ready ? 0.85 : 0.0
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 8
+            radius: 20
+            color: Qt.rgba(0.03, 0.06, 0.14, 0.36)
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 8
+            radius: 20
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(0.75, 0.9, 1.0, 0.14)
+        }
     }
 
     Rectangle {
         anchors.fill: parent
-        color: Qt.rgba(0.02, 0.05, 0.12, 0.56)
+        color: Qt.rgba(0.02, 0.05, 0.12, 0.46)
     }
 
     Repeater {
