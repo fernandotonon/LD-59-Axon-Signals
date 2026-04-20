@@ -60,7 +60,10 @@ ApplicationWindow {
     property var pathMyelinCache: ({})
     property var levelResults: []
     property var endingSummaryModel: []
-    property bool showEndingScreen: false
+    property string appViewState: "menu" // "menu" | "game" | "ending"
+    readonly property bool showMenuScreen: appViewState === "menu"
+    readonly property bool showGameScreen: appViewState === "game"
+    readonly property bool showEndingScreen: appViewState === "ending"
     property bool pendingNextLevel: false
     property string timePressureText: ""
     property bool runAttempted: false
@@ -359,11 +362,11 @@ ApplicationWindow {
         endingSummaryModel = buildEndingSummary();
         pendingNextLevel = false;
         howDrawer.close();
-        showEndingScreen = true;
+        appViewState = "ending";
     }
 
     function restartGameFromEnding() {
-        showEndingScreen = false;
+        appViewState = "game";
         levelResults = [];
         endingSummaryModel = [];
         pendingNextLevel = false;
@@ -371,7 +374,13 @@ ApplicationWindow {
     }
 
     function replayLevelsFromEnding() {
-        showEndingScreen = false;
+        appViewState = "game";
+        pendingNextLevel = false;
+        applyLevel(0);
+    }
+
+    function startGameFromMenu() {
+        appViewState = "game";
         pendingNextLevel = false;
         applyLevel(0);
     }
@@ -403,6 +412,13 @@ ApplicationWindow {
     }
 
     function resolveStoryAssetSource(filename) {
+        var base = "" + Qt.resolvedUrl("main.qml");
+        if (base.indexOf("qrc:/") === 0)
+            return "qrc:/assets/" + filename;
+        return "../assets/" + filename;
+    }
+
+    function resolveCoverAssetSource(filename) {
         var base = "" + Qt.resolvedUrl("main.qml");
         if (base.indexOf("qrc:/") === 0)
             return "qrc:/assets/" + filename;
@@ -657,7 +673,6 @@ ApplicationWindow {
 
     function applyLevel(idx) {
         stopPlayback();
-        showEndingScreen = false;
         currentLevelIndex = idx;
         selectedPathIndex = 0;
         pathMyelinCache = {};
@@ -745,7 +760,7 @@ ApplicationWindow {
     }
 
     Component.onCompleted: {
-        applyLevel(0);
+        appViewState = "menu";
         updateMusicState();
     }
 
@@ -907,7 +922,7 @@ ApplicationWindow {
     MouseArea {
         z: 9998
         anchors.fill: parent
-        visible: win.dykPanelText.length > 0
+        visible: win.showGameScreen && win.dykPanelText.length > 0
         acceptedButtons: Qt.AllButtons
         hoverEnabled: false
         onClicked: win.dismissDidYouKnow()
@@ -916,7 +931,7 @@ ApplicationWindow {
     Rectangle {
         id: dykPanel
         z: 10000
-        visible: win.dykPanelText.length > 0
+        visible: win.showGameScreen && win.dykPanelText.length > 0
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.top: parent.top
         anchors.topMargin: 56
@@ -984,6 +999,16 @@ ApplicationWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         width: Math.min(parent.width - 18, 1560)
         spacing: uiGap
+        enabled: win.showGameScreen
+        opacity: win.showGameScreen ? 1.0 : 0.0
+        visible: opacity > 0.01
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 260
+                easing.type: Easing.OutCubic
+            }
+        }
 
         RowLayout {
             Layout.fillWidth: true
@@ -2246,6 +2271,76 @@ ApplicationWindow {
 
     Item {
         anchors.fill: parent
+        z: 25000
+
+        Loader {
+            id: welcomeScreenLoader
+            anchors.fill: parent
+            active: true
+            source: "WelcomeScreen.qml"
+        }
+
+        Binding {
+            target: welcomeScreenLoader.item
+            property: "active"
+            value: win.showMenuScreen
+            when: welcomeScreenLoader.status === Loader.Ready
+        }
+        Binding {
+            target: welcomeScreenLoader.item
+            property: "coverSource"
+            value: win.resolveCoverAssetSource("axon-signals-cover.png")
+            when: welcomeScreenLoader.status === Loader.Ready
+        }
+        Binding {
+            target: welcomeScreenLoader.item
+            property: "pulseClock"
+            value: win.ionClock
+            when: welcomeScreenLoader.status === Loader.Ready
+        }
+        Binding {
+            target: welcomeScreenLoader.item
+            property: "musicEnabled"
+            value: win.musicEnabled
+            when: welcomeScreenLoader.status === Loader.Ready
+        }
+        Binding {
+            target: welcomeScreenLoader.item
+            property: "sfxEnabled"
+            value: win.sfxEnabled
+            when: welcomeScreenLoader.status === Loader.Ready
+        }
+        Binding {
+            target: welcomeScreenLoader.item
+            property: "howItWorksLines"
+            value: win.howItWorksLines
+            when: welcomeScreenLoader.status === Loader.Ready
+        }
+
+        Connections {
+            target: welcomeScreenLoader.item
+            enabled: welcomeScreenLoader.status === Loader.Ready
+            function onStartRequested() {
+                win.playSfx("click");
+                win.startGameFromMenu();
+            }
+            function onMusicToggleRequested() {
+                var nextMusic = !win.musicEnabled;
+                win.musicEnabled = nextMusic;
+                if (nextMusic)
+                    win.playSfx("click");
+            }
+            function onSfxToggleRequested() {
+                var nextSfx = !win.sfxEnabled;
+                win.sfxEnabled = nextSfx;
+                if (nextSfx)
+                    win.playSfx("click");
+            }
+        }
+    }
+
+    Item {
+        anchors.fill: parent
         visible: win.showEndingScreen
         z: 30000
 
@@ -2299,7 +2394,7 @@ ApplicationWindow {
             }
             function onRulesRequested() {
                 win.playSfx("click");
-                win.showEndingScreen = false;
+                win.appViewState = "game";
                 win.howDrawer.open();
             }
         }

@@ -5,8 +5,10 @@
         <file alias="qml/AudioController.qml">AudioController.qml</file>
         <file alias="qml/AudioControllerClay.qml">AudioControllerClay.qml</file>
         <file alias="qml/EndingScreen.qml">EndingScreen.qml</file>
+        <file alias="qml/WelcomeScreen.qml">WelcomeScreen.qml</file>
         <file alias="qml/js/signalSim.js">js/signalSim.js</file>
         <file alias="qml/js/levels.js">js/levels.js</file>
+        <file alias="assets/axon-signals-cover.png">../assets/axon-signals-cover.png</file>
         <file alias="assets/ice_cream_truck.glb">../assets/ice_cream_truck.glb</file>
         <file alias="assets/frying_pan.glb">../assets/frying_pan.glb</file>
         <file alias="assets/nailed_plank.glb">../assets/nailed_plank.glb</file>
